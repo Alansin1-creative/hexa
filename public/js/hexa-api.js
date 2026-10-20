@@ -125,7 +125,8 @@ async function findEstilo(estiloId) {
 async function subirAngulos(prefijo, form) {
   const urls = {};
   for (const angulo of ANGULOS_API) {
-    const file = form?.querySelector(`input[name="${angulo}"]`)?.files?.[0];
+    const file =
+      form?._hexaFotos?.[angulo] || form?.querySelector(`input[name="${angulo}"]`)?.files?.[0];
     if (!file) continue;
     const ref = bucket().ref(`${prefijo}/${angulo}-${Date.now()}`);
     await ref.put(file, { contentType: file.type || "image/jpeg" });

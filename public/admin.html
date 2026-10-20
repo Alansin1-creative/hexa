@@ -93,12 +93,20 @@
       <div class="cam-stage">
         <video id="cam-video" autoplay playsinline muted></video>
         <div class="cam-frame" id="cam-frame" data-angulo="frente"></div>
+        <div class="cam-review" id="cam-review" hidden>
+          <img id="cam-preview" alt="Recorte" />
+        </div>
       </div>
       <canvas id="cam-canvas" hidden></canvas>
-      <div class="qty" style="margin-top: 12px;">
+      <p class="hint" id="cam-review-msg" hidden>Así queda recortada, como se guardará. Confirma o repite la toma.</p>
+      <div class="qty" id="cam-acciones-live" style="margin-top: 12px;">
         <button type="button" class="btn" id="cam-capturar">Capturar</button>
         <button type="button" class="ghost" id="cam-saltar">Saltar</button>
         <button type="button" class="ghost" id="cam-cerrar">Cerrar</button>
+      </div>
+      <div class="qty" id="cam-acciones-review" hidden style="margin-top: 12px;">
+        <button type="button" class="btn" id="cam-usar">Usar esta foto</button>
+        <button type="button" class="ghost" id="cam-repetir">Repetir</button>
       </div>
     </div>
   </div>
