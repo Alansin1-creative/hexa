@@ -23,25 +23,31 @@
     </div>
   </header>
   <main class="wrap" style="padding:36px 0 80px" id="ok"></main>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
+  <script src="/js/firebase-config.js"></script>
+  <script src="/js/hexa-api.js"></script>
   <script src="/js/theme.js"></script>
   <script src="/js/platform.js"></script>
   <script src="/js/carrito.js"></script>
   <script>
     (async () => {
       const id = new URLSearchParams(location.search).get("id");
-      const res = await fetch("/api/pedidos/" + id);
-      const p = await res.json();
       const pagos = { efectivo: "Efectivo contra entrega", transferencia: "Transferencia", tarjeta: "Tarjeta al recibir" };
-      document.getElementById("ok").innerHTML = res.ok
-        ? `<div class="kicker">Pedido #${p.id}</div>
+      try {
+        const p = await HexaAPI.pedido(id);
+        document.getElementById("ok").innerHTML = `<div class="kicker">Pedido #${p.id}</div>
            <h1>Listo, ${p.nombre}</h1>
            <p class="lede">Total ${money(p.total)} · ${pagos[p.metodo_pago] || p.metodo_pago}.</p>
            <div class="card" style="padding:16px">
-             ${p.items.map((i) => `<div class="row"><span>${i.producto_nombre} (${i.estilo_nombre}) × ${i.cantidad}</span><span>${money(i.precio_unitario * i.cantidad)}</span></div>`).join("")}
+             ${(p.items || []).map((i) => `<div class="row"><span>${i.producto_nombre} (${i.estilo_nombre}) × ${i.cantidad}</span><span>${money(i.precio_unitario * i.cantidad)}</span></div>`).join("")}
              <p class="hint">${p.permiso_ubicacion ? "Incluye ubicación GPS para el envío." : "Sin GPS. Dirección: " + (p.direccion || "—")}</p>
            </div>
-           <p style="margin-top:18px"><a class="btn" href="/">Seguir viendo</a></p>`
-        : `<p class="empty">No encontramos ese pedido.</p>`;
+           <p style="margin-top:18px"><a class="btn" href="/">Seguir viendo</a></p>`;
+      } catch {
+        document.getElementById("ok").innerHTML = `<p class="empty">No encontramos ese pedido.</p>`;
+      }
     })();
   </script>
 </body>

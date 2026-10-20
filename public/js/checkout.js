@@ -40,8 +40,7 @@ function pintarCarrito() {
 
 async function checarTel() {
   const tel = document.querySelector("[name=telefono]").value;
-  const res = await fetch(`/api/verificar/estado?telefono=${encodeURIComponent(tel)}`);
-  const data = await res.json();
+  const data = await HexaAPI.estadoTel(tel);
   const el = document.getElementById("estado-tel");
   if (data.primera_compra) {
     el.textContent = "Primera compra: vamos a comprobar que el número es tuyo con un código.";
@@ -53,14 +52,11 @@ async function checarTel() {
 document.getElementById("btn-codigo").addEventListener("click", async () => {
   const telefono = document.querySelector("[name=telefono]").value;
   const msg = document.getElementById("msg-verif");
-  const res = await fetch("/api/verificar/enviar", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ telefono }),
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    msg.textContent = data.error;
+  let data;
+  try {
+    data = await HexaAPI.enviarCodigo(telefono);
+  } catch (err) {
+    msg.textContent = err.message;
     msg.className = "hint danger";
     return;
   }
@@ -73,14 +69,11 @@ document.getElementById("btn-confirmar").addEventListener("click", async () => {
   const telefono = document.querySelector("[name=telefono]").value;
   const codigo = document.querySelector("[name=codigo]").value;
   const msg = document.getElementById("msg-verif");
-  const res = await fetch("/api/verificar/confirmar", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ telefono, codigo }),
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    msg.textContent = data.error;
+  let data;
+  try {
+    data = await HexaAPI.confirmarCodigo(telefono, codigo);
+  } catch (err) {
+    msg.textContent = err.message;
     msg.className = "hint danger";
     return;
   }
@@ -146,10 +139,9 @@ document.getElementById("checkout").addEventListener("submit", async (ev) => {
     msg.className = "hint danger";
     return;
   }
-  const res = await fetch("/api/pedidos", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
+  let data;
+  try {
+    data = await HexaAPI.crearPedido({
       nombre: fd.get("nombre"),
       telefono,
       token: verif.token,
@@ -160,11 +152,9 @@ document.getElementById("checkout").addEventListener("submit", async (ev) => {
       lng: gps.lng,
       precision_m: gps.precision_m,
       items: leerCarrito().map((x) => ({ estilo_id: x.estilo_id, cantidad: x.cantidad })),
-    }),
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    msg.textContent = data.error;
+    });
+  } catch (err) {
+    msg.textContent = err.message;
     msg.className = "hint danger";
     return;
   }

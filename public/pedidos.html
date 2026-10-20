@@ -37,12 +37,17 @@
       <table id="tabla"></table>
     </div>
   </main>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
+  <script src="/js/firebase-config.js"></script>
+  <script src="/js/hexa-api.js"></script>
   <script src="/js/theme.js"></script>
   <script src="/js/platform.js"></script>
   <script src="/js/carrito.js"></script>
   <script>
     (async () => {
-      const d = await (await fetch("/api/pedidos")).json();
+      const d = await HexaAPI.pedidos();
       document.getElementById("tabla").innerHTML = `
         <thead><tr><th>#</th><th>Cliente</th><th>Teléfono</th><th>Pago</th><th>GPS</th><th>Total</th><th>Fecha</th></tr></thead>
         <tbody>${

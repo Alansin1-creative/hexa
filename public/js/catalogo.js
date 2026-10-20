@@ -47,7 +47,12 @@ function pintar() {
 }
 
 async function cargar() {
-  productos = await (await fetch("/api/vitrina")).json();
+  try {
+    productos = await HexaAPI.vitrina();
+  } catch (err) {
+    document.getElementById("catalogo").innerHTML = `<div class="empty">${err.message}</div>`;
+    return;
+  }
   pintar();
 }
 

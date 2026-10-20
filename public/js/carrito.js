@@ -22,7 +22,7 @@ function agregarAlCarrito(item) {
 }
 
 function quitarDelCarrito(estiloId) {
-  guardarCarrito(leerCarrito().filter((x) => x.estilo_id !== estiloId));
+  guardarCarrito(leerCarrito().filter((x) => String(x.estilo_id) !== String(estiloId)));
 }
 
 function totalCarrito() {

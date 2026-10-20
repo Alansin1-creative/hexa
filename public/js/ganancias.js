@@ -3,7 +3,7 @@ function kpi(label, value) {
 }
 
 async function cargar() {
-  const d = await (await fetch("/api/dashboard")).json();
+  const d = await HexaAPI.dashboard();
   document.getElementById("kpis").innerHTML = [
     kpi("Valor del stock (costo)", money(d.inventario_costo)),
     kpi("Valor del stock (venta)", money(d.inventario_venta)),

@@ -120,11 +120,11 @@ alta.precio_venta.addEventListener("input", actualizarMargen);
 alta.addEventListener("submit", async (ev) => {
   ev.preventDefault();
   const msg = document.getElementById("alta-msg");
-  const fd = new FormData(alta);
-  const res = await fetch("/api/productos", { method: "POST", body: fd });
-  const data = await res.json();
-  if (!res.ok) {
-    msg.textContent = data.error;
+  let data;
+  try {
+    data = await HexaAPI.crearProducto(alta);
+  } catch (err) {
+    msg.textContent = err.message || "No se pudo guardar";
     msg.className = "hint danger";
     return;
   }
@@ -141,7 +141,13 @@ alta.addEventListener("submit", async (ev) => {
 });
 
 async function cargarLista() {
-  const productos = await (await fetch("/api/productos")).json();
+  let productos = [];
+  try {
+    productos = await HexaAPI.productos();
+  } catch (err) {
+    document.getElementById("lista").innerHTML = `<p class="empty">${err.message}</p>`;
+    return;
+  }
   const root = document.getElementById("lista");
   if (!productos.length) {
     root.innerHTML = `<p class="empty">No hay artículos en la base de datos.</p>`;
@@ -221,7 +227,7 @@ async function cargarLista() {
   root.querySelectorAll("[data-del]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       if (!confirm("¿Borrar producto, fotos y movimientos?")) return;
-      await fetch(`/api/productos/${btn.dataset.del}`, { method: "DELETE" });
+      await HexaAPI.borrarProducto(btn.dataset.del);
       cargarLista();
     });
   });
@@ -229,37 +235,33 @@ async function cargarLista() {
     form.addEventListener("submit", async (ev) => {
       ev.preventDefault();
       const cantidad = Number(new FormData(form).get("cantidad"));
-      const res = await fetch(`/api/estilos/${form.dataset.stock}/stock`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cantidad, nota: "Ajuste desde inventario" }),
-      });
-      const data = await res.json();
-      if (!res.ok) return alert(data.error);
+      try {
+        await HexaAPI.ajustarStock(form.dataset.stock, cantidad, "Ajuste desde inventario");
+      } catch (err) {
+        return alert(err.message);
+      }
       cargarLista();
     });
   });
   root.querySelectorAll("[data-fotos]").forEach((form) => {
     form.addEventListener("submit", async (ev) => {
       ev.preventDefault();
-      const res = await fetch(`/api/estilos/${form.dataset.fotos}/imagenes`, {
-        method: "POST",
-        body: new FormData(form),
-      });
-      const data = await res.json();
-      if (!res.ok) return alert(data.error);
+      try {
+        await HexaAPI.guardarFotos(form.dataset.fotos, form);
+      } catch (err) {
+        return alert(err.message);
+      }
       cargarLista();
     });
   });
   root.querySelectorAll("[data-estilo]").forEach((form) => {
     form.addEventListener("submit", async (ev) => {
       ev.preventDefault();
-      const res = await fetch(`/api/productos/${form.dataset.estilo}/estilos`, {
-        method: "POST",
-        body: new FormData(form),
-      });
-      const data = await res.json();
-      if (!res.ok) return alert(data.error);
+      try {
+        await HexaAPI.agregarEstilo(form.dataset.estilo, form);
+      } catch (err) {
+        return alert(err.message);
+      }
       cargarLista();
     });
   });

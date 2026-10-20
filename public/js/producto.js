@@ -2,12 +2,11 @@ const params = new URLSearchParams(location.search);
 const id = params.get("id");
 
 async function cargar() {
-  const res = await fetch(`/api/vitrina/${id}`);
-  if (!res.ok) {
+  try {
+    render(await HexaAPI.vitrinaUno(id));
+  } catch {
     document.getElementById("detalle").innerHTML = `<p class="empty">Producto no encontrado.</p>`;
-    return;
   }
-  render(await res.json());
 }
 
 function render(producto) {
