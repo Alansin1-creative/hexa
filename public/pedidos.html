@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="nocturno">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#12110f" />
+  <title>HEXA · Pedidos</title>
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+  <script src="/js/platform-boot.js"></script>
+  <link rel="stylesheet" href="/css/app.css" />
+  <link rel="stylesheet" href="/css/platform.css" />
+</head>
+<body>
+  <header class="top">
+    <div class="wrap top-inner">
+      <a class="brand" href="/"><span class="mark">H</span><b>HEXA</b></a>
+      <nav class="nav">
+        <a href="/">Catálogo</a>
+        <a href="/admin.html">Inventario</a>
+        <a class="active" href="/pedidos.html">Pedidos</a>
+        <a href="/ganancias.html">Ganancias</a>
+      </nav>
+      <div class="themes">
+        <button class="dot" data-theme-btn="nocturno"></button>
+        <button class="dot" data-theme-btn="atelier"></button>
+        <button class="dot" data-theme-btn="neon"></button>
+      </div>
+    </div>
+  </header>
+  <main class="wrap" style="padding:36px 0 80px">
+    <section class="hero" style="padding-top:8px">
+      <div class="kicker">Tienda</div>
+      <h1>Pedidos de clientes</h1>
+    </section>
+    <div class="card" style="padding:8px 16px 16px; overflow:auto">
+      <table id="tabla"></table>
+    </div>
+  </main>
+  <script src="/js/theme.js"></script>
+  <script src="/js/platform.js"></script>
+  <script src="/js/carrito.js"></script>
+  <script>
+    (async () => {
+      const d = await (await fetch("/api/pedidos")).json();
+      document.getElementById("tabla").innerHTML = `
+        <thead><tr><th>#</th><th>Cliente</th><th>Teléfono</th><th>Pago</th><th>GPS</th><th>Total</th><th>Fecha</th></tr></thead>
+        <tbody>${
+          d.length
+            ? d.map((p) => `<tr>
+                <td><a href="/pedido.html?id=${p.id}">${p.id}</a></td>
+                <td>${p.nombre}</td><td>${p.telefono}</td><td>${p.metodo_pago}</td>
+                <td>${p.permiso_ubicacion ? `${p.lat?.toFixed?.(4)}, ${p.lng?.toFixed?.(4)}` : "no"}</td>
+                <td>${money(p.total)}</td><td>${p.creado_en}</td>
+              </tr>`).join("")
+            : `<tr><td colspan="7">Aún no hay pedidos.</td></tr>`
+        }</tbody>`;
+    })();
+  </script>
+</body>
+</html>

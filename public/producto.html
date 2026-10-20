@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="nocturno">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#12110f" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="HEXA" />
+  <title>HEXA · Producto</title>
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" href="/icons/icon-192.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Outfit:wght@400;500;650;800&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
+  <script src="/js/platform-boot.js"></script>
+  <link rel="stylesheet" href="/css/app.css" />
+  <link rel="stylesheet" href="/css/platform.css" />
+</head>
+<body>
+  <header class="top">
+    <div class="wrap top-inner">
+      <a class="brand" href="/"><span class="mark">H</span><b>HEXA</b></a>
+      <nav class="nav">
+        <a href="/">Catálogo</a>
+        <a href="/admin.html">Inventario</a>
+        <a href="/ganancias.html">Ganancias</a>
+      </nav>
+      <div class="themes">
+        <button class="dot" data-theme-btn="nocturno"></button>
+        <button class="dot" data-theme-btn="atelier"></button>
+        <button class="dot" data-theme-btn="neon"></button>
+      </div>
+    </div>
+  </header>
+  <main class="wrap layout" id="detalle"></main>
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <script src="/js/theme.js"></script>
+  <script src="/js/platform.js"></script>
+  <script src="/js/carrito.js"></script>
+  <script src="/js/viewer3d.js"></script>
+  <script src="/js/producto.js"></script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+{
+  "id": "/",
+  "name": "HEXA Tienda",
+  "short_name": "HEXA",
+  "description": "Catálogo con visor 3D, inventario y ganancias. Cupertino en iOS y Material en Android.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#12110f",
+  "theme_color": "#d7b07a",
+  "lang": "es",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
