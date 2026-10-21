@@ -72,25 +72,23 @@ function recortarACanvas(img, box) {
   return c;
 }
 
-function cargarImagen(url, cors) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    if (cors) img.crossOrigin = "anonymous";
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("img"));
-    img.src = url;
-  });
+function urlCara(url) {
+  try {
+    const u = new URL(url, location.href);
+    if (u.origin === location.origin) return url;
+    if (/firebasestorage\.googleapis\.com$|storage\.googleapis\.com$/.test(u.hostname)) {
+      return `/api/foto?u=${encodeURIComponent(u.href)}`;
+    }
+  } catch {
+    /* seguir con la url original */
+  }
+  return url;
 }
 
 async function cargarCara(url) {
-  let img = null;
-  try {
-    img = await cargarImagen(url, true);
-  } catch {
-    const res = await fetch(url, { mode: "cors" });
-    if (!res.ok) throw new Error("foto");
-    img = await createImageBitmap(await res.blob());
-  }
+  const res = await fetch(urlCara(url));
+  if (!res.ok) throw new Error("foto");
+  const img = await createImageBitmap(await res.blob());
   const box = bboxLetra(img);
   const canvas = recortarACanvas(img, box);
   img.close?.();

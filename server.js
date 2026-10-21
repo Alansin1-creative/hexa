@@ -63,6 +63,32 @@ function guardarImagenes(estiloId, files) {
 
 registrarShop(app);
 
+function urlFotoPermitida(raw) {
+  try {
+    const u = new URL(raw);
+    if (u.protocol !== "https:") return false;
+    if (u.hostname !== "firebasestorage.googleapis.com" && u.hostname !== "storage.googleapis.com") {
+      return false;
+    }
+    return u.pathname.includes("green-a2929");
+  } catch {
+    return false;
+  }
+}
+
+app.get("/api/foto", (req, res) => {
+  const raw = req.query.u;
+  if (!urlFotoPermitida(raw)) return res.status(400).send("url");
+  fetch(raw)
+    .then(async (r) => {
+      if (!r.ok) return res.status(r.status).send("fail");
+      res.set("Content-Type", r.headers.get("content-type") || "image/jpeg");
+      res.set("Cache-Control", "public, max-age=86400");
+      res.send(Buffer.from(await r.arrayBuffer()));
+    })
+    .catch(() => res.status(502).send("fail"));
+});
+
 app.get("/api/angulos", (_req, res) => res.json(ANGULOS));
 
 app.get("/api/productos", (_req, res) => {

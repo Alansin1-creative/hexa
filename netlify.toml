@@ -1,2 +1,11 @@
 [build]
   publish = "public"
+
+[functions]
+  directory = "netlify/functions"
+
+[[redirects]]
+  from = "/api/foto"
+  to = "/.netlify/functions/foto"
+  status = 200
+  force = true
