@@ -42,7 +42,25 @@ function montarAngulos(container, imagenes = {}) {
   ).join("");
   const form = container.closest("form");
   container.querySelectorAll("input[type=file]").forEach((input) => {
-    input.addEventListener("change", () => pintarProgreso(form));
+    input.addEventListener("change", () => {
+      const file = input.files?.[0];
+      if (input.dataset.hexaListo === "1") {
+        delete input.dataset.hexaListo;
+        pintarProgreso(form);
+        return;
+      }
+      if (!file) {
+        pintarProgreso(form);
+        return;
+      }
+      iniciarEstudio({
+        form,
+        angulos: [input.getAttribute("name")],
+        input,
+        desde: "archivo",
+        file,
+      });
+    });
   });
   container.querySelectorAll(".cam-one").forEach((btn) => {
     btn.addEventListener("click", (ev) => {
@@ -58,12 +76,10 @@ function montarAngulos(container, imagenes = {}) {
   container.querySelectorAll(".file-one").forEach((btn) => {
     btn.addEventListener("click", (ev) => {
       ev.stopPropagation();
-      iniciarEstudio({
-        form,
-        angulos: [btn.dataset.angulo],
-        input: form.querySelector(`input[name="${btn.dataset.angulo}"]`),
-        desde: "archivo",
-      });
+      const input = form.querySelector(`input[name="${btn.dataset.angulo}"]`);
+      if (!input) return;
+      input.value = "";
+      input.click();
     });
   });
 }
@@ -105,6 +121,8 @@ modalAlta?.addEventListener("click", (ev) => {
   if (ev.target === modalAlta) cerrarAlta();
 });
 document.addEventListener("keydown", (ev) => {
+  const estudio = document.getElementById("estudio");
+  if (ev.key === "Escape" && estudio && !estudio.hidden) return;
   if (ev.key === "Escape" && modalAlta && !modalAlta.hidden) cerrarAlta();
 });
 

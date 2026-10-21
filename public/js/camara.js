@@ -43,6 +43,7 @@ function guardarFotoLocal(form, angulo, file) {
 
 function ponerArchivo(input, file) {
   if (!input || !file) return;
+  input.dataset.hexaListo = "1";
   try {
     const dt = new DataTransfer();
     dt.items.add(file);
@@ -144,6 +145,7 @@ function modoRevision(on) {
 
 function mostrarEstudio(angulo, pasoTexto) {
   const modal = document.getElementById("estudio");
+  if (modal && modal.parentElement !== document.body) document.body.appendChild(modal);
   document.getElementById("estudio-titulo").textContent = LABELS[angulo] || angulo;
   document.getElementById("estudio-guia").textContent = GUIAS[angulo] || "";
   document.getElementById("estudio-paso").textContent = pasoTexto;
@@ -169,7 +171,7 @@ function pedirGaleria() {
   pick.click();
 }
 
-function iniciarEstudio({ form, angulos, input, desde = "camara" }) {
+function iniciarEstudio({ form, angulos, input, desde = "camara", file = null }) {
   formDestino = form || input?.closest("form");
   inputUnico = input || null;
   colaAngulos = angulos;
@@ -180,7 +182,13 @@ function iniciarEstudio({ form, angulos, input, desde = "camara" }) {
   const angulo = colaAngulos[0];
   mostrarEstudio(angulo, `1 / ${colaAngulos.length}`);
   if (desde === "archivo") {
-    pedirGaleria();
+    if (file) {
+      archivoAFotoBase(file)
+        .then((cuadro) => entrarRevision(cuadro))
+        .catch((err) => alert(err.message || "No se pudo abrir esa foto."));
+    } else {
+      pedirGaleria();
+    }
     return;
   }
   abrirCamara().catch((err) => {
@@ -929,7 +937,12 @@ function archivoAFotoBase(file) {
 function entrarRevision(canvas) {
   fotoBase = canvas;
   pendiente = true;
-  const sugerido = sugerirCorte(canvas);
+  let sugerido;
+  try {
+    sugerido = sugerirCorte(canvas);
+  } catch (_) {
+    sugerido = { rect: { x: 72, y: 72, w: 880, h: 880 }, auto: false, crudo: null };
+  }
   ultimoAutoRect = sugerido.crudo || sugerido.rect;
   cropAspect = 0;
   cropRect = clampCrop(sugerido.rect);
@@ -954,12 +967,12 @@ function aplicarFoto(blob) {
   const angulo = colaAngulos[indiceCola];
   const file = new File([blob], `${angulo}.jpg`, { type: "image/jpeg" });
   const input = inputUnico || fileInputDe(formDestino, angulo);
+  guardarFotoLocal(formDestino, angulo, file);
   if (input) {
     ponerArchivo(input, file);
     previewEnSlot(input, URL.createObjectURL(blob));
-  } else {
-    guardarFotoLocal(formDestino, angulo, file);
   }
+  if (formDestino && typeof pintarProgreso === "function") pintarProgreso(formDestino);
 }
 
 function cablearEstudio() {

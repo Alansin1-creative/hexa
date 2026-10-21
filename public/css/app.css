@@ -177,7 +177,8 @@ a.card:hover {
   background: color-mix(in srgb, var(--card) 80%, var(--bg));
 }
 .stat span { display: block; color: var(--muted); font-size: 12px; }
-.qty { display: flex; gap: 8px; }
+.qty { display: flex; gap: 8px; flex-wrap: wrap; }
+.qty[hidden] { display: none !important; }
 .qty input, .form input, .form textarea, .form select {
   width: 100%;
   background: var(--bg-2);
@@ -306,7 +307,7 @@ label { font-size: 12px; color: var(--muted); display: grid; gap: 6px; }
   box-shadow: var(--shadow);
 }
 .estudio {
-  position: fixed; inset: 0; z-index: 10000;
+  position: fixed; inset: 0; z-index: 20000;
   width: 100vw; height: 100dvh; max-width: none;
   margin: 0;
   background: rgba(0,0,0,.62);
