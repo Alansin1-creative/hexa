@@ -33,21 +33,27 @@ function montarAngulos(container, imagenes = {}) {
       <div class="angle${imagenes[id] ? " listo" : ""}" data-slot="${id}">
         <span>${label}${imagenes[id] ? " ✓" : ""}</span>
         <img class="prev" alt="${label}" ${imagenes[id] ? `src="${imagenes[id]}"` : "hidden"} />
-        <input class="file-oculto" type="file" name="${id}" accept="image/*" capture="environment" />
-        <button type="button" class="ghost cam-one" data-angulo="${id}">Cámara</button>
+        <input class="file-oculto" type="file" name="${id}" accept="image/*" />
+        <div class="angle-actions">
+          <button type="button" class="ghost cam-one" data-angulo="${id}">Cámara</button>
+          <button type="button" class="ghost file-one" data-angulo="${id}">Subir</button>
+        </div>
       </div>`
   ).join("");
   const form = container.closest("form");
-  container.querySelectorAll(".angle").forEach((slot) => {
-    slot.addEventListener("click", (ev) => {
-      if (ev.target.closest("button")) return;
-      slot.querySelector("input[type=file]")?.click();
+  container.querySelectorAll(".file-one").forEach((btn) => {
+    btn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      form.querySelector(`input[name="${btn.dataset.angulo}"]`)?.click();
     });
   });
   container.querySelectorAll("input[type=file]").forEach((input) => {
     input.addEventListener("change", () => {
       const file = input.files?.[0];
-      if (file) previewEnSlot(input, URL.createObjectURL(file));
+      if (file) {
+        guardarFotoLocal(form, input.getAttribute("name"), file);
+        previewEnSlot(input, URL.createObjectURL(file));
+      }
       pintarProgreso(form);
     });
   });

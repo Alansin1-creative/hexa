@@ -201,7 +201,18 @@ label { font-size: 12px; color: var(--muted); display: grid; gap: 6px; }
   min-height: 118px;
   background: var(--bg-2);
 }
-.angle { cursor: pointer; position: relative; }
+.angle { position: relative; }
+.angle-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.angle-actions .ghost {
+  flex: 1;
+  padding: 7px 6px;
+  font-size: 12px;
+  text-align: center;
+}
 .file-oculto {
   position: absolute;
   width: 1px; height: 1px;
