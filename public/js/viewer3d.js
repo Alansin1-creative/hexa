@@ -20,62 +20,61 @@ function recorteLetra(img) {
   const ih = img.naturalHeight || img.height;
   if (!iw || !ih) return { x: 0, y: 0, w: iw || 1, h: ih || 1 };
   try {
-  const tw = 240;
-  const th = Math.max(80, Math.round((ih * tw) / iw));
-  const c = document.createElement("canvas");
-  c.width = tw;
-  c.height = th;
-  const ctx = c.getContext("2d", { willReadFrequently: true });
-  ctx.drawImage(img, 0, 0, tw, th);
-  const { data } = ctx.getImageData(0, 0, tw, th);
-  const muestra = (x, y) => {
-    const i = (y * tw + x) * 4;
-    return { r: data[i], g: data[i + 1], b: data[i + 2] };
-  };
-  const fondo = muestra(2, 2);
-  const filaFondo = (y) => {
-    let n = 0;
-    for (let x = 0; x < tw; x += 2) {
+    const tw = 240;
+    const th = Math.max(80, Math.round((ih * tw) / iw));
+    const c = document.createElement("canvas");
+    c.width = tw;
+    c.height = th;
+    const ctx = c.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, tw, th);
+    const { data } = ctx.getImageData(0, 0, tw, th);
+    const muestra = (x, y) => {
       const i = (y * tw + x) * 4;
-      if (distFondo(data[i], data[i + 1], data[i + 2], fondo) < 36) n++;
-    }
-    return n / Math.ceil(tw / 2) > 0.9;
-  };
-  const colFondo = (x) => {
-    let n = 0;
-    for (let y = 0; y < th; y += 2) {
-      const i = (y * tw + x) * 4;
-      if (distFondo(data[i], data[i + 1], data[i + 2], fondo) < 36) n++;
-    }
-    return n / Math.ceil(th / 2) > 0.9;
-  };
-  let y0 = 0;
-  let y1 = th - 1;
-  let x0 = 0;
-  let x1 = tw - 1;
-  while (y0 < y1 - 8 && filaFondo(y0)) y0++;
-  while (y1 > y0 + 8 && filaFondo(y1)) y1--;
-  while (x0 < x1 - 8 && colFondo(x0)) x0++;
-  while (x1 > x0 + 8 && colFondo(x1)) x1--;
-  const bw = x1 - x0 + 1;
-  const bh = y1 - y0 + 1;
-  if (bw / tw > 0.96 && bh / th > 0.96) {
-    return { x: 0, y: 0, w: iw, h: ih };
-  }
-  return {
-    x: (x0 / tw) * iw,
-    y: (y0 / th) * ih,
-    w: (bw / tw) * iw,
-    h: (bh / th) * ih,
-  };
+      return { r: data[i], g: data[i + 1], b: data[i + 2] };
+    };
+    const fondo = muestra(2, 2);
+    const filaFondo = (y) => {
+      let n = 0;
+      for (let x = 0; x < tw; x += 2) {
+        const i = (y * tw + x) * 4;
+        if (distFondo(data[i], data[i + 1], data[i + 2], fondo) < 36) n++;
+      }
+      return n / Math.ceil(tw / 2) > 0.9;
+    };
+    const colFondo = (x) => {
+      let n = 0;
+      for (let y = 0; y < th; y += 2) {
+        const i = (y * tw + x) * 4;
+        if (distFondo(data[i], data[i + 1], data[i + 2], fondo) < 36) n++;
+      }
+      return n / Math.ceil(th / 2) > 0.9;
+    };
+    let y0 = 0;
+    let y1 = th - 1;
+    let x0 = 0;
+    let x1 = tw - 1;
+    while (y0 < y1 - 8 && filaFondo(y0)) y0++;
+    while (y1 > y0 + 8 && filaFondo(y1)) y1--;
+    while (x0 < x1 - 8 && colFondo(x0)) x0++;
+    while (x1 > x0 + 8 && colFondo(x1)) x1--;
+    const bw = x1 - x0 + 1;
+    const bh = y1 - y0 + 1;
+    if (bw / tw > 0.96 && bh / th > 0.96) return { x: 0, y: 0, w: iw, h: ih };
+    return {
+      x: (x0 / tw) * iw,
+      y: (y0 / th) * ih,
+      w: (bw / tw) * iw,
+      h: (bh / th) * ih,
+    };
   } catch (_) {
     return { x: 0, y: 0, w: iw, h: ih };
   }
 }
 
 function aplicarCropUV(tex, box) {
-  const iw = tex.image.naturalWidth || tex.image.width;
-  const ih = tex.image.naturalHeight || tex.image.height;
+  const img = tex.image;
+  const iw = img.naturalWidth || img.width;
+  const ih = img.naturalHeight || img.height;
   if (!iw || !ih || box.w < 8 || box.h < 8) return;
   tex.wrapS = THREE.ClampToEdgeWrapping;
   tex.wrapT = THREE.ClampToEdgeWrapping;
@@ -103,6 +102,41 @@ function dimensionesDeMedidas(m) {
   return { x: sx * k, y: sy * k, z: sz * k };
 }
 
+function pegarTextura(mat, tex) {
+  if (THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  mat.map = tex;
+  mat.color.set(0xffffff);
+  mat.needsUpdate = true;
+}
+
+function texturaDesdeUrl(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const tex = new THREE.Texture(img);
+      tex.needsUpdate = true;
+      resolve(tex);
+    };
+    img.onerror = () => reject(new Error("foto"));
+    img.referrerPolicy = "no-referrer";
+    img.src = url;
+  });
+}
+
+async function medirDesdeUrl(url) {
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const bmp = await createImageBitmap(blob);
+    const box = recorteLetra(bmp);
+    bmp.close?.();
+    return box;
+  } catch (_) {
+    return null;
+  }
+}
+
 function iniciarVisor(contenedor, imagenes) {
   destruirVisor();
   const width = Math.max(contenedor.clientWidth, 320);
@@ -122,77 +156,87 @@ function iniciarVisor(contenedor, imagenes) {
   contenedor.innerHTML = "";
   contenedor.appendChild(renderer.domElement);
 
-  const loader = new THREE.TextureLoader();
-  loader.setCrossOrigin("anonymous");
-
-  const cargar = (url) =>
-    new Promise((resolve) => {
-      loader.load(
-        url,
-        (tex) => resolve(tex),
-        undefined,
-        () => resolve(null)
-      );
-    });
-
-  Promise.all(CARAS.map((angulo) => (imagenes[angulo] ? cargar(imagenes[angulo]) : Promise.resolve(null)))).then(
-    (texturas) => {
-      const medidas = {};
-      const materiales = texturas.map((tex, i) => {
-        if (!tex || !tex.image) return new THREE.MeshBasicMaterial({ color: 0xc4a574 });
-        if (THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
-        const box = recorteLetra(tex.image);
-        medidas[CARAS[i]] = box;
-        aplicarCropUV(tex, box);
-        return new THREE.MeshBasicMaterial({ map: tex });
-      });
-      const dim = dimensionesDeMedidas(medidas);
-      const geo = new THREE.BoxGeometry(dim.x, dim.y, dim.z);
-      const mesh = new THREE.Mesh(geo, materiales);
-      const edges = new THREE.LineSegments(
-        new THREE.EdgesGeometry(geo),
-        new THREE.LineBasicMaterial({ color: 0xe8c890, linewidth: 2 })
-      );
-      mesh.add(edges);
-      scene.add(mesh);
-
-      const lejos = 2.15 + Math.max(dim.x, dim.y, dim.z) * 0.35;
-      camera.position.set(lejos * 0.9, lejos * 0.55, lejos);
-      camera.lookAt(0, 0, 0);
-
-      let dragging = false;
-      let lastX = 0;
-      let lastY = 0;
-      renderer.domElement.style.cursor = "grab";
-      renderer.domElement.addEventListener("pointerdown", (e) => {
-        dragging = true;
-        lastX = e.clientX;
-        lastY = e.clientY;
-        renderer.domElement.setPointerCapture(e.pointerId);
-        renderer.domElement.style.cursor = "grabbing";
-      });
-      const onUp = () => {
-        dragging = false;
-        renderer.domElement.style.cursor = "grab";
-      };
-      const onMove = (e) => {
-        if (!dragging) return;
-        mesh.rotation.y += (e.clientX - lastX) * 0.012;
-        mesh.rotation.x += (e.clientY - lastY) * 0.012;
-        lastX = e.clientX;
-        lastY = e.clientY;
-      };
-      window.addEventListener("pointerup", onUp);
-      window.addEventListener("pointermove", onMove);
-
-      const state = { renderer, frame: 0, onUp, onMove };
-      escenaActiva = state;
-      const loop = () => {
-        if (!dragging) mesh.rotation.y += 0.008;
-        renderer.render(scene, camera);
-        state.frame = requestAnimationFrame(loop);
-      };
-      loop();
-    }
+  const materiales = CARAS.map(() => new THREE.MeshBasicMaterial({ color: 0xffffff }));
+  let geo = new THREE.BoxGeometry(1.55, 1.55, 1.55);
+  const mesh = new THREE.Mesh(geo, materiales);
+  let edges = new THREE.LineSegments(
+    new THREE.EdgesGeometry(geo),
+    new THREE.LineBasicMaterial({ color: 0xe8c890 })
   );
+  mesh.add(edges);
+  scene.add(mesh);
+
+  const medidas = {};
+  const redimensionar = () => {
+    if (!Object.keys(medidas).length) return;
+    const dim = dimensionesDeMedidas(medidas);
+    const next = new THREE.BoxGeometry(dim.x, dim.y, dim.z);
+    mesh.geometry.dispose();
+    mesh.geometry = next;
+    mesh.remove(edges);
+    edges.geometry.dispose();
+    edges = new THREE.LineSegments(
+      new THREE.EdgesGeometry(next),
+      new THREE.LineBasicMaterial({ color: 0xe8c890 })
+    );
+    mesh.add(edges);
+    const lejos = 2.15 + Math.max(dim.x, dim.y, dim.z) * 0.35;
+    camera.position.set(lejos * 0.9, lejos * 0.55, lejos);
+    camera.lookAt(0, 0, 0);
+  };
+
+  CARAS.forEach((angulo, i) => {
+    const url = imagenes?.[angulo];
+    if (!url) {
+      materiales[i].color.set(0xc4a574);
+      return;
+    }
+    texturaDesdeUrl(url)
+      .then((tex) => {
+        pegarTextura(materiales[i], tex);
+        return medirDesdeUrl(url).then((box) => {
+          const usado = box || recorteLetra(tex.image);
+          medidas[angulo] = usado;
+          aplicarCropUV(tex, usado);
+          redimensionar();
+        });
+      })
+      .catch(() => {
+        materiales[i].color.set(0xc4a574);
+      });
+  });
+
+  let dragging = false;
+  let lastX = 0;
+  let lastY = 0;
+  renderer.domElement.style.cursor = "grab";
+  renderer.domElement.addEventListener("pointerdown", (e) => {
+    dragging = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    renderer.domElement.setPointerCapture(e.pointerId);
+    renderer.domElement.style.cursor = "grabbing";
+  });
+  const onUp = () => {
+    dragging = false;
+    renderer.domElement.style.cursor = "grab";
+  };
+  const onMove = (e) => {
+    if (!dragging) return;
+    mesh.rotation.y += (e.clientX - lastX) * 0.012;
+    mesh.rotation.x += (e.clientY - lastY) * 0.012;
+    lastX = e.clientX;
+    lastY = e.clientY;
+  };
+  window.addEventListener("pointerup", onUp);
+  window.addEventListener("pointermove", onMove);
+
+  const state = { renderer, frame: 0, onUp, onMove };
+  escenaActiva = state;
+  const loop = () => {
+    if (!dragging) mesh.rotation.y += 0.008;
+    renderer.render(scene, camera);
+    state.frame = requestAnimationFrame(loop);
+  };
+  loop();
 }
