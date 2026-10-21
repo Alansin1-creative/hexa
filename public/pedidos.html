@@ -32,8 +32,9 @@
     <section class="hero" style="padding-top:8px">
       <div class="kicker">Tienda</div>
       <h1>Pedidos de clientes</h1>
-      <p class="lede">Los pedidos llegan aquí cuando alguien confirma en la tienda. Ábrelos para ver teléfono, pago y dirección.</p>
+      <p class="lede">Los pedidos llegan aquí cuando alguien confirma en la tienda. Si hay GPS, agrégalo como parada y ábrelo en Maps.</p>
     </section>
+    <div class="card ruta-panel" id="ruta-panel"></div>
     <div class="card" style="padding:8px 16px 16px; overflow:auto">
       <table id="tabla"></table>
     </div>
@@ -46,21 +47,48 @@
   <script src="/js/theme.js"></script>
   <script src="/js/platform.js"></script>
   <script src="/js/carrito.js"></script>
+  <script src="/js/ruta.js"></script>
   <script>
     (async () => {
+      const panel = document.getElementById("ruta-panel");
+      HexaRuta.pintarPanelRuta(panel);
       const d = await HexaAPI.pedidos();
       document.getElementById("tabla").innerHTML = `
         <thead><tr><th>#</th><th>Cliente</th><th>Teléfono</th><th>Pago</th><th>GPS</th><th>Total</th><th>Fecha</th></tr></thead>
         <tbody>${
           d.length
-            ? d.map((p) => `<tr>
+            ? d.map((p) => {
+                const gps = HexaRuta.pedidoConGps(p);
+                const lat = Number(p.lat);
+                const lng = Number(p.lng);
+                return `<tr>
                 <td><a href="/pedido.html?id=${p.id}">${p.id}</a></td>
                 <td>${p.nombre}</td><td>${p.telefono}</td><td>${p.metodo_pago}</td>
-                <td>${p.permiso_ubicacion ? `${p.lat?.toFixed?.(4)}, ${p.lng?.toFixed?.(4)}` : "no"}</td>
+                <td>${
+                  gps
+                    ? `<div class="gps-acciones">
+                        <a class="ghost con-ico" href="${HexaRuta.urlMapsDestino(lat, lng)}" target="_blank" rel="noopener">${window.hexaIco ? hexaIco("pin") : ""}<span>${lat.toFixed(4)}, ${lng.toFixed(4)}</span></a>
+                        <button type="button" class="ghost con-ico" data-parada="${p.id}">${window.hexaIco ? hexaIco("plus") : ""}<span>Parada</span></button>
+                      </div>`
+                    : "no"
+                }</td>
                 <td>${money(p.total)}</td><td>${p.creado_en}</td>
-              </tr>`).join("")
+              </tr>`;
+              }).join("")
             : `<tr><td colspan="7">Aún no hay pedidos.</td></tr>`
         }</tbody>`;
+      const porId = Object.fromEntries(d.map((p) => [String(p.id), p]));
+      document.querySelectorAll("[data-parada]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          try {
+            HexaRuta.agregarParada(porId[btn.dataset.parada]);
+            HexaRuta.pintarPanelRuta(panel);
+            btn.querySelector("span").textContent = "En ruta";
+          } catch (err) {
+            alert(err.message);
+          }
+        });
+      });
     })();
   </script>
 </body>

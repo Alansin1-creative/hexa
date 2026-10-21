@@ -29,6 +29,8 @@ const HEXA_ICOS = {
   libre: '<rect x="5" y="6" width="14" height="12" rx="2" stroke-dasharray="2.6 2"/>',
   toda: '<path d="M9 5H5v4M15 5h4v4M9 19H5v-4M19 19h-4v-4"/>',
   cubo: '<path d="M12 3.2 20 7.5v9L12 20.8 4 16.5v-9L12 3.2z"/><path d="M12 20.8V12M4 7.5l8 4.5 8-4.5"/>',
+  pin: '<path d="M12 21s7-6.2 7-11.2A7 7 0 0 0 5 9.8C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.8" r="2.2"/>',
+  ruta: '<path d="M5 19h14"/><circle cx="7.5" cy="7.5" r="2.2"/><circle cx="16.5" cy="12.5" r="2.2"/><path d="M9.2 8.8 14.4 11.4"/>',
 };
 
 function hexaIco(name, cls = "ico") {

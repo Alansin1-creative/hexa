@@ -1,4 +1,4 @@
-const CACHE = "hexa-v8";
+const CACHE = "hexa-v9";
 const APP_SHELL = [
   "/",
   "/admin.html",
@@ -21,6 +21,7 @@ const APP_SHELL = [
   "/js/carrito.js",
   "/js/checkout.js",
   "/js/viewer3d.js",
+  "/js/ruta.js",
   "/manifest.json",
   "/icons/icon-192.png",
   "/icons/icon-512.png",

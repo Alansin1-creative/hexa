@@ -31,20 +31,47 @@
   <script src="/js/theme.js"></script>
   <script src="/js/platform.js"></script>
   <script src="/js/carrito.js"></script>
+  <script src="/js/ruta.js"></script>
   <script>
     (async () => {
       const id = new URLSearchParams(location.search).get("id");
       const pagos = { efectivo: "Efectivo contra entrega", transferencia: "Transferencia", tarjeta: "Tarjeta al recibir" };
       try {
         const p = await HexaAPI.pedido(id);
+        const gps = HexaRuta.pedidoConGps(p);
+        const lat = Number(p.lat);
+        const lng = Number(p.lng);
         document.getElementById("ok").innerHTML = `<div class="kicker">Pedido #${p.id}</div>
            <h1>Listo, ${p.nombre}</h1>
            <p class="lede">Total ${money(p.total)} · ${pagos[p.metodo_pago] || p.metodo_pago}.</p>
            <div class="card" style="padding:16px">
              ${(p.items || []).map((i) => `<div class="row"><span>${i.producto_nombre} (${i.estilo_nombre}) × ${i.cantidad}</span><span>${money(i.precio_unitario * i.cantidad)}</span></div>`).join("")}
-             <p class="hint">${p.permiso_ubicacion ? "Incluye ubicación GPS para el envío." : "Sin GPS. Dirección: " + (p.direccion || "—")}</p>
+             <p class="hint">${gps ? "Incluye ubicación GPS para el envío." : "Sin GPS. Dirección: " + (p.direccion || "—")}</p>
+             ${
+               gps
+                 ? `<iframe class="mapa-entrega" title="Destino de entrega" src="${HexaRuta.urlMapsEmbed(lat, lng)}" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+                    <div class="qty" style="margin-top:12px">
+                      <a class="btn con-ico" href="${HexaRuta.urlMapsDestino(lat, lng)}" target="_blank" rel="noopener">${window.hexaIco ? hexaIco("ruta") : ""}<span>Ir en Maps</span></a>
+                      <button type="button" class="ghost con-ico" id="add-parada">${window.hexaIco ? hexaIco("plus") : ""}<span>Agregar parada</span></button>
+                      <a class="ghost con-ico" href="${HexaRuta.urlMapsPunto(lat, lng)}" target="_blank" rel="noopener">${window.hexaIco ? hexaIco("pin") : ""}<span>Ver punto</span></a>
+                    </div>
+                    <p class="hint" id="msg-ruta">La ruta sale de tu ubicación actual. Esta entrega queda como destino, o como nueva parada si ya hay otras.</p>`
+                 : ""
+             }
            </div>
-           <p style="margin-top:18px"><a class="btn" href="/">Seguir viendo</a></p>`;
+           <p style="margin-top:18px"><a class="btn" href="/pedidos.html">Ver pedidos</a></p>`;
+        document.getElementById("add-parada")?.addEventListener("click", () => {
+          try {
+            const ruta = HexaRuta.agregarParada(p);
+            const msg = document.getElementById("msg-ruta");
+            msg.textContent = `Parada ${ruta.length} agregada. El destino ahora es ${p.nombre}.`;
+            msg.className = "hint ok";
+            const ir = document.querySelector('a[href*="maps/dir"]');
+            if (ir) ir.href = HexaRuta.urlMapsRuta(ruta);
+          } catch (err) {
+            alert(err.message);
+          }
+        });
       } catch {
         document.getElementById("ok").innerHTML = `<p class="empty">No encontramos ese pedido.</p>`;
       }
