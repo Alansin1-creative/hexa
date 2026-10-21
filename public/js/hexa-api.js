@@ -252,6 +252,68 @@ async function crearProductoInterno(form) {
   return leerProducto(ref.id);
 }
 
+async function actualizarProductoInterno(productoId, estiloId, form) {
+  const fd = new FormData(form);
+  const nombre = String(fd.get("nombre") || "").trim();
+  const costoNum = Number(fd.get("costo"));
+  const ventaNum = Number(fd.get("precio_venta"));
+  const stockNum = Number.parseInt(fd.get("stock"), 10);
+  if (!nombre) throw new Error("El nombre es obligatorio");
+  if (!Number.isFinite(costoNum) || costoNum < 0) throw new Error("Costo inválido");
+  if (!Number.isFinite(ventaNum) || ventaNum < 0) throw new Error("Precio de venta inválido");
+  if (!Number.isInteger(stockNum) || stockNum < 0) throw new Error("Stock inválido");
+  const hallado = await findEstilo(estiloId);
+  if (!hallado || String(hallado.productoId) !== String(productoId)) {
+    throw new Error("Producto no encontrado");
+  }
+  const nuevas = await subirAngulos(`estilos/${estiloId}`, form);
+  const ref = db().collection("productos").doc(String(productoId));
+  let deltaStock = 0;
+  let estiloNombre = "";
+  await db().runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) throw new Error("Producto no encontrado");
+    const data = snap.data();
+    const estilos = [...(data.estilos || [])];
+    const i = estilos.findIndex((e) => String(e.id) === String(estiloId));
+    if (i < 0) throw new Error("Estilo no encontrado");
+    const prev = estilos[i];
+    deltaStock = stockNum - Number(prev.stock || 0);
+    estiloNombre = String(fd.get("estilo_nombre") || prev.nombre || "Clásico").trim();
+    estilos[i] = {
+      ...prev,
+      nombre: estiloNombre,
+      color_hex: fd.get("color_hex") || prev.color_hex,
+      costo: costoNum,
+      precio_venta: ventaNum,
+      stock: stockNum,
+      imagenes: { ...(prev.imagenes || {}), ...nuevas },
+    };
+    tx.update(ref, {
+      nombre,
+      descripcion: String(fd.get("descripcion") || "").trim(),
+      categoria: String(fd.get("categoria") || "General").trim(),
+      estilos,
+      actualizado_en: nowIso(),
+    });
+  });
+  if (deltaStock !== 0) {
+    await db().collection("movimientos").add({
+      estilo_id: estiloId,
+      tipo: deltaStock > 0 ? "entrada" : "ajuste",
+      cantidad: deltaStock,
+      costo_unitario: costoNum,
+      precio_unitario: null,
+      ganancia: 0,
+      nota: "Edición de producto",
+      producto: nombre,
+      estilo: estiloNombre,
+      creado_en: nowIso(),
+    });
+  }
+  return leerProducto(productoId);
+}
+
 async function siguientePedido() {
   const ref = db().collection("meta").doc("contadores");
   return db().runTransaction(async (tx) => {
@@ -277,6 +339,13 @@ const HexaAPI = {
   async crearProducto(form) {
     try {
       return await crearProductoInterno(form);
+    } catch (err) {
+      throw errorHexa(err);
+    }
+  },
+  async actualizarProducto(productoId, estiloId, form) {
+    try {
+      return await actualizarProductoInterno(productoId, estiloId, form);
     } catch (err) {
       throw errorHexa(err);
     }

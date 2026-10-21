@@ -43,6 +43,7 @@ function render(producto) {
       }
     </div>
     <aside class="panel">
+      <a class="back-link" href="/">← Volver al catálogo</a>
       <div class="kicker">${producto.categoria}</div>
       <h1>${producto.nombre}</h1>
       <p>${producto.descripcion || "Sin descripción."}</p>
@@ -63,9 +64,9 @@ function render(producto) {
       </div>
       <form class="qty" id="al-carrito">
         <input type="number" name="cantidad" min="1" max="${Math.max(estilo.stock, 1)}" value="1" />
-        <button class="btn" type="submit" ${estilo.stock < 1 ? "disabled" : ""}>Agregar al carrito</button>
+        <button class="btn" type="submit" ${estilo.stock < 1 ? "disabled" : ""}>${estilo.stock < 1 ? "Agotado" : "Agregar al carrito"}</button>
       </form>
-      <p class="hint" id="cart-msg"></p>
+      <p class="hint" id="cart-msg">${estilo.stock < 1 ? "Este estilo no tiene piezas." : "Puedes seguir viendo o ir a Pedido cuando quieras."}</p>
     </aside>
   `;
 
@@ -87,7 +88,7 @@ function render(producto) {
       cantidad,
     });
     const msg = document.getElementById("cart-msg");
-    msg.textContent = "En el carrito. Puedes seguir viendo o ir a Pedido.";
+    msg.innerHTML = `Listo, ya está en el carrito. <a href="/checkout.html">Ir a Pedido</a>`;
     msg.className = "hint ok";
   });
 }

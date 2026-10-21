@@ -12,7 +12,11 @@ function pintar() {
     return `${p.nombre} ${p.categoria} ${p.estilos.map((e) => e.nombre).join(" ")}`.toLowerCase().includes(q);
   });
   if (!productos.length) {
-    root.innerHTML = `<div class="empty">No hay productos disponibles por ahora.</div>`;
+    root.innerHTML = `<div class="empty">
+      <p>El catálogo está vacío.</p>
+      <p class="hint">Si administras la tienda, da de alta el primer producto.</p>
+      <a class="btn" href="/admin.html">Ir a inventario</a>
+    </div>`;
     return;
   }
   if (!lista.length) {
@@ -35,7 +39,7 @@ function pintar() {
             <strong>${p.nombre}</strong>
             <div class="row">
               <span class="price">${estilo ? money(estilo.precio_venta) : "—"}</span>
-              <span class="meta${p.stock_total <= 2 ? " stock-bajo" : ""}">Stock ${p.stock_total}</span>
+              <span class="meta${p.stock_total <= 2 ? " stock-bajo" : ""}">${p.stock_total <= 0 ? "Agotado" : `${p.stock_total} disponibles`}</span>
             </div>
             <div class="swatches">
               ${p.estilos.map((e) => `<span class="swatch" style="background:${e.color_hex}" title="${e.nombre}"></span>`).join("")}

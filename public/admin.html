@@ -41,37 +41,40 @@
     <section class="hero" style="padding-top: 8px;">
       <div class="kicker">Almacén</div>
       <div class="row">
-        <h1>Existencias</h1>
+        <h1>Inventario</h1>
         <button type="button" class="btn btn-plus" id="btn-nuevo" aria-label="Nuevo producto">+</button>
       </div>
-      <p class="lede">El catálogo se arma aquí. Pulsa + para dar de alta un producto con su estilo, precios y fotos.</p>
+      <p class="lede">Da de alta, edita ficha y fotos, o ajusta stock. Lo que guardes aquí es lo que ve el catálogo.</p>
     </section>
-    <div id="lista" class="lista"></div>
+    <div class="toolbar">
+      <input id="buscar-inv" type="search" placeholder="Buscar producto, estilo o categoría" />
+    </div>
+    <div id="lista" class="lista"><p class="empty">Cargando inventario…</p></div>
   </main>
 
   <div class="modal" id="modal-alta" hidden>
     <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="alta-titulo">
       <div class="row">
         <div>
-          <div class="kicker">Alta de mercancía</div>
+          <div class="kicker" id="alta-kicker">Alta de mercancía</div>
           <h2 id="alta-titulo">Nuevo producto</h2>
         </div>
         <button type="button" class="ghost" id="cerrar-alta">Cerrar</button>
       </div>
-      <p class="hint">Costo y precio de venta son obligatorios. Con las seis fotos se arma el 3D; si falta alguna, queda en 2D.</p>
+      <p class="hint" id="alta-hint">Costo y precio son obligatorios. Con las seis fotos se arma el 3D; si falta alguna, queda en 2D.</p>
       <form class="form" id="alta">
         <div class="form-grid">
           <label>Nombre del producto<input name="nombre" required placeholder="Bolso de lona" /></label>
           <label>Categoría<input name="categoria" placeholder="Accesorios" /></label>
         </div>
         <label>Descripción<textarea name="descripcion" rows="3" placeholder="Material, medidas, uso..."></textarea></label>
-        <h3>Estilo inicial</h3>
+        <h3 id="alta-estilo-titulo">Estilo</h3>
         <div class="form-grid">
           <label>Nombre del estilo<input name="estilo_nombre" value="Clásico" required /></label>
           <label>Color<input name="color_hex" type="color" value="#c4a574" /></label>
           <label>Costo (lo que te costó)<input name="costo" type="number" min="0" step="0.01" required /></label>
           <label>Precio de venta<input name="precio_venta" type="number" min="0" step="0.01" required /></label>
-          <label>Stock inicial<input name="stock" type="number" min="0" step="1" value="1" required /></label>
+          <label id="label-stock">Stock inicial<input name="stock" type="number" min="0" step="1" value="1" required /></label>
           <p class="hint" id="margen-preview">Ganancia unitaria: —</p>
         </div>
         <div class="row">
@@ -79,7 +82,7 @@
           <button type="button" class="ghost" data-estudio>Estudio 3D (6 fotos)</button>
         </div>
         <div class="angles" id="angles"></div>
-        <button class="btn" type="submit">Guardar producto</button>
+        <button class="btn" type="submit" id="alta-submit">Guardar producto</button>
         <p class="hint" id="alta-msg"></p>
       </form>
     </div>

@@ -456,7 +456,29 @@ th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--lin
   font-weight: 700;
 }
 
+.card-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.btn-danger { color: var(--danger); }
+.btn-danger:hover { border-color: var(--danger); }
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.form input:focus, .form textarea:focus, .toolbar input:focus, .qty input:focus {
+  border-color: var(--gold);
+  outline: none;
+}
+.back-link { color: var(--muted); font-size: 14px; }
+.back-link:hover { color: var(--gold); }
+.empty .btn { margin-top: 12px; }
+.pay:has(input:checked) {
+  border-color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 10%, transparent);
+}
+.thumbs button[aria-current="true"], .thumbs button:focus {
+  border-color: var(--gold);
+}
+
 @media (max-width: 900px) {
   .layout, .form-grid { grid-template-columns: 1fr; }
   .angles { grid-template-columns: 1fr 1fr; }
+  .stock-head { align-items: flex-start; }
+  .card-actions { width: 100%; }
+  .price-mini { margin-left: 0; }
 }
