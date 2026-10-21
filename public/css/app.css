@@ -354,18 +354,60 @@ label { font-size: 12px; color: var(--muted); display: grid; gap: 6px; }
 }
 .cam-review {
   position: absolute; inset: 0;
-  display: grid; place-items: center;
   background: #111;
   z-index: 2;
+  touch-action: none;
 }
 .cam-review[hidden] { display: none !important; }
-#cam-preview {
-  width: calc(100% - 36px);
-  height: calc(100% - 36px);
-  object-fit: contain;
-  border-radius: 16px;
+.crop-stage {
+  position: absolute;
+  inset: 12px;
 }
-#cam-preview.redonda { border-radius: 50%; }
+#crop-view {
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+}
+.crop-box {
+  position: absolute;
+  border: 2px solid var(--gold);
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.48);
+  cursor: move;
+  touch-action: none;
+}
+.crop-box i {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  background: var(--gold);
+  border: 2px solid #111;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+.crop-box i[data-h="nw"] { top: -9px; left: -9px; cursor: nwse-resize; }
+.crop-box i[data-h="ne"] { top: -9px; right: -9px; cursor: nesw-resize; }
+.crop-box i[data-h="se"] { bottom: -9px; right: -9px; cursor: nwse-resize; }
+.crop-box i[data-h="sw"] { bottom: -9px; left: -9px; cursor: nesw-resize; }
+.crop-box i[data-h="n"] { top: -9px; left: calc(50% - 9px); cursor: ns-resize; }
+.crop-box i[data-h="s"] { bottom: -9px; left: calc(50% - 9px); cursor: ns-resize; }
+.crop-box i[data-h="e"] { right: -9px; top: calc(50% - 9px); cursor: ew-resize; }
+.crop-box i[data-h="w"] { left: -9px; top: calc(50% - 9px); cursor: ew-resize; }
+.crop-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.crop-tools[hidden] { display: none !important; }
+.crop-tools .ghost {
+  padding: 8px 12px;
+  font-size: 13px;
+}
+.crop-tools .ghost.on {
+  border-color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 18%, transparent);
+}
 .cam-frame[data-angulo="arriba"], .cam-frame[data-angulo="abajo"] { border-radius: 50%; }
 .cam-frame[data-angulo="izquierda"] { transform: perspective(400px) rotateY(18deg); }
 .cam-frame[data-angulo="derecha"] { transform: perspective(400px) rotateY(-18deg); }

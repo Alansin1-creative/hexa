@@ -22,6 +22,11 @@ let indiceCola = 0;
 let formDestino = null;
 let inputUnico = null;
 let pendiente = null;
+let fotoBase = null;
+let cropRect = { x: 80, y: 80, w: 864, h: 864 };
+let cropAspect = 0;
+let cropDrag = null;
+const FOTO_LADO = 1024;
 
 function fileInputDe(form, angulo) {
   return form?.querySelector(`input[name="${angulo}"]`);
@@ -113,18 +118,22 @@ function cerrarCamara() {
   const video = document.getElementById("cam-video");
   if (video) video.srcObject = null;
   pendiente = null;
+  fotoBase = null;
+  cropDrag = null;
 }
 
 function modoRevision(on) {
   const review = document.getElementById("cam-review");
   const live = document.getElementById("cam-acciones-live");
   const revAcc = document.getElementById("cam-acciones-review");
+  const tools = document.getElementById("crop-tools");
   const msg = document.getElementById("cam-review-msg");
   const video = document.getElementById("cam-video");
   const frame = document.getElementById("cam-frame");
   if (review) review.hidden = !on;
   if (live) live.hidden = on;
   if (revAcc) revAcc.hidden = !on;
+  if (tools) tools.hidden = !on;
   if (msg) msg.hidden = !on;
   if (video) video.style.opacity = on ? "0" : "1";
   if (frame) frame.style.visibility = on ? "hidden" : "visible";
@@ -566,7 +575,7 @@ function bboxObjeto(srcCanvas) {
 }
 
 function letterboxCuadrado(src, x, y, w, h) {
-  const out = 1024;
+  const out = FOTO_LADO;
   const canvas = document.getElementById("cam-canvas");
   canvas.width = out;
   canvas.height = out;
@@ -583,14 +592,157 @@ function letterboxCuadrado(src, x, y, w, h) {
   return canvas;
 }
 
-function capturarYRecortarObjeto() {
+function clampCrop(r) {
+  const S = FOTO_LADO;
+  const min = 48;
+  let { x, y, w, h } = r;
+  w = Math.max(min, Math.min(S, w));
+  h = Math.max(min, Math.min(S, h));
+  if (cropAspect) {
+    if (w / h > cropAspect) w = h * cropAspect;
+    else h = w / cropAspect;
+    if (w > S) {
+      w = S;
+      h = w / cropAspect;
+    }
+    if (h > S) {
+      h = S;
+      w = h * cropAspect;
+    }
+    w = Math.max(min, w);
+    h = Math.max(min, h);
+  }
+  x = Math.max(0, Math.min(S - w, x));
+  y = Math.max(0, Math.min(S - h, y));
+  return { x, y, w, h };
+}
+
+function forzarAspecto(aspect) {
+  cropAspect = aspect;
+  const cx = cropRect.x + cropRect.w / 2;
+  const cy = cropRect.y + cropRect.h / 2;
+  if (aspect) {
+    let w = cropRect.w;
+    let h = w / aspect;
+    if (h > cropRect.h) {
+      h = cropRect.h;
+      w = h * aspect;
+    }
+    cropRect = clampCrop({ x: cx - w / 2, y: cy - h / 2, w, h });
+  } else {
+    cropRect = clampCrop(cropRect);
+  }
+  pintarCropBox();
+  marcarHerramienta();
+}
+
+function marcarHerramienta() {
+  const ids = {
+    "crop-libre": cropAspect === 0,
+    "crop-1-1": cropAspect === 1,
+    "crop-4-3": cropAspect === 4 / 3,
+  };
+  Object.entries(ids).forEach(([id, on]) => {
+    document.getElementById(id)?.classList.toggle("on", on);
+  });
+}
+
+function pintarCropBox() {
+  const box = document.getElementById("crop-box");
+  if (!box) return;
+  const p = (n) => `${(n / FOTO_LADO) * 100}%`;
+  box.style.left = p(cropRect.x);
+  box.style.top = p(cropRect.y);
+  box.style.width = p(cropRect.w);
+  box.style.height = p(cropRect.h);
+}
+
+function mostrarFotoBase() {
+  const view = document.getElementById("crop-view");
+  if (!view || !fotoBase) return;
+  view.width = FOTO_LADO;
+  view.height = FOTO_LADO;
+  view.getContext("2d").drawImage(fotoBase, 0, 0);
+  pintarCropBox();
+}
+
+function sugerirCorte(canvas) {
+  const caja = bboxObjeto(canvas);
+  const areaOk = caja && caja.w > 48 && caja.h > 48 && caja.w * caja.h < 0.82 * FOTO_LADO * FOTO_LADO;
+  if (areaOk) return { rect: caja, auto: true };
+  return { rect: { x: 72, y: 72, w: 880, h: 880 }, auto: false };
+}
+
+function aplicarAutoCorte() {
+  if (!fotoBase) return;
+  cropAspect = 0;
+  const { rect, auto } = sugerirCorte(fotoBase);
+  cropRect = clampCrop(rect);
+  pintarCropBox();
+  marcarHerramienta();
+  const msg = document.getElementById("cam-review-msg");
+  if (msg) {
+    msg.textContent = auto
+      ? "Sugerencia automática. Arrastra las esquinas para ajustar."
+      : "No se aisló solo. Ajusta el recuadro a mano.";
+  }
+}
+
+function puntoEnFoto(e) {
+  const stage = document.getElementById("crop-stage");
+  const r = stage.getBoundingClientRect();
+  const t = e.touches ? e.touches[0] : e;
+  return {
+    x: ((t.clientX - r.left) / r.width) * FOTO_LADO,
+    y: ((t.clientY - r.top) / r.height) * FOTO_LADO,
+  };
+}
+
+function moverCrop(h, start, dx, dy) {
+  let { x, y, w, ht } = { x: start.x, y: start.y, w: start.w, ht: start.h };
+  if (h === "move") {
+    x = start.x + dx;
+    y = start.y + dy;
+    return clampCrop({ x, y, w, h: ht });
+  }
+  if (h.includes("e")) w = start.w + dx;
+  if (h.includes("s")) ht = start.h + dy;
+  if (h.includes("w")) {
+    x = start.x + dx;
+    w = start.w - dx;
+  }
+  if (h.includes("n")) {
+    y = start.y + dy;
+    ht = start.h - dy;
+  }
+  if (w < 48) {
+    if (h.includes("w")) x = start.x + start.w - 48;
+    w = 48;
+  }
+  if (ht < 48) {
+    if (h.includes("n")) y = start.y + start.h - 48;
+    ht = 48;
+  }
+  if (cropAspect) {
+    if (h === "n" || h === "s") w = ht * cropAspect;
+    else if (h === "e" || h === "w") ht = w / cropAspect;
+    else {
+      ht = w / cropAspect;
+      if (h.includes("n")) y = start.y + start.h - ht;
+      if (h.includes("w")) x = start.x + start.w - w;
+    }
+  }
+  return clampCrop({ x, y, w, h: ht });
+}
+
+function capturarCuadro() {
   const map = mapaVideoCover();
   if (!map.vw) return null;
   const vista = rectEnVideo(map.vRect, map);
   const ladoVista = Math.min(vista.sw, vista.sh);
   const tmp = document.createElement("canvas");
-  tmp.width = 1024;
-  tmp.height = 1024;
+  tmp.width = FOTO_LADO;
+  tmp.height = FOTO_LADO;
   tmp.getContext("2d").drawImage(
     map.video,
     vista.sx + (vista.sw - ladoVista) / 2,
@@ -599,21 +751,10 @@ function capturarYRecortarObjeto() {
     ladoVista,
     0,
     0,
-    1024,
-    1024
+    FOTO_LADO,
+    FOTO_LADO
   );
-  const caja = bboxObjeto(tmp);
-  const areaOk = caja && caja.w > 48 && caja.h > 48 && caja.w * caja.h < 0.82 * 1024 * 1024;
-  if (areaOk) {
-    return { canvas: letterboxCuadrado(tmp, caja.x, caja.y, caja.w, caja.h), recortado: true };
-  }
-  const frame = document.getElementById("cam-frame");
-  const f = rectEnVideo(frame.getBoundingClientRect(), map);
-  const lado = Math.min(f.sw, f.sh);
-  return {
-    canvas: copiarVideoRect(f.sx + (f.sw - lado) / 2, f.sy + (f.sh - lado) / 2, lado, lado, 1024, 1024),
-    recortado: false,
-  };
+  return tmp;
 }
 
 function canvasABlob(canvas) {
@@ -636,25 +777,59 @@ function cablearEstudio() {
   const modal = document.getElementById("estudio");
   if (!modal || modal.dataset.ready) return;
   modal.dataset.ready = "1";
+  const stage = document.getElementById("crop-stage");
+  const box = document.getElementById("crop-box");
+  const onMove = (e) => {
+    if (!cropDrag) return;
+    e.preventDefault();
+    const p = puntoEnFoto(e);
+    cropRect = moverCrop(cropDrag.h, cropDrag.start, p.x - cropDrag.x, p.y - cropDrag.y);
+    pintarCropBox();
+  };
+  const onUp = () => {
+    cropDrag = null;
+  };
+  stage?.addEventListener("pointerdown", (e) => {
+    if (!fotoBase) return;
+    const h = e.target.dataset.h || (e.target === box || box.contains(e.target) ? "move" : "");
+    if (!h) return;
+    const p = puntoEnFoto(e);
+    cropDrag = { h, x: p.x, y: p.y, start: { ...cropRect } };
+    stage.setPointerCapture?.(e.pointerId);
+    e.preventDefault();
+  });
+  stage?.addEventListener("pointermove", onMove);
+  stage?.addEventListener("pointerup", onUp);
+  stage?.addEventListener("pointercancel", onUp);
+  document.getElementById("crop-auto")?.addEventListener("click", aplicarAutoCorte);
+  document.getElementById("crop-1-1")?.addEventListener("click", () => forzarAspecto(1));
+  document.getElementById("crop-4-3")?.addEventListener("click", () => forzarAspecto(4 / 3));
+  document.getElementById("crop-libre")?.addEventListener("click", () => forzarAspecto(0));
+  document.getElementById("crop-todo")?.addEventListener("click", () => {
+    cropAspect = 0;
+    cropRect = { x: 0, y: 0, w: FOTO_LADO, h: FOTO_LADO };
+    pintarCropBox();
+    marcarHerramienta();
+  });
   document.getElementById("cam-capturar").addEventListener("click", async () => {
     const btn = document.getElementById("cam-capturar");
     btn.disabled = true;
     try {
       await esperarVideo(document.getElementById("cam-video"));
-      const toma = capturarYRecortarObjeto();
-      if (!toma?.canvas) throw new Error("Aún no hay imagen de la cámara");
-      const blob = await canvasABlob(toma.canvas);
-      if (!blob || blob.size < 100) throw new Error("La captura salió vacía");
-      pendiente = blob;
-      const img = document.getElementById("cam-preview");
-      if (img.src) URL.revokeObjectURL(img.src);
-      img.src = URL.createObjectURL(blob);
-      img.classList.remove("redonda");
+      const cuadro = capturarCuadro();
+      if (!cuadro) throw new Error("Aún no hay imagen de la cámara");
+      fotoBase = cuadro;
+      pendiente = true;
+      const sugerido = sugerirCorte(cuadro);
+      cropAspect = 0;
+      cropRect = clampCrop(sugerido.rect);
+      mostrarFotoBase();
+      marcarHerramienta();
       const msg = document.getElementById("cam-review-msg");
       if (msg) {
-        msg.textContent = toma.recortado
-          ? "Recortamos al objeto. Si el corte está bien, confírmalo; si no, repite la toma."
-          : "No se aisló el objeto (fondo muy ocupado). Se usó el recuadro. Acerca el producto o usa un fondo más simple y repite.";
+        msg.textContent = sugerido.auto
+          ? "Ajusta el recuadro (esquinas o Auto / 1:1) y confirma el recorte."
+          : "Mueve y estira el recuadro hasta cubrir solo el objeto.";
       }
       modoRevision(true);
     } catch (err) {
@@ -664,19 +839,25 @@ function cablearEstudio() {
     }
   });
   document.getElementById("cam-usar").addEventListener("click", async () => {
-    if (!pendiente) return;
-    aplicarFoto(pendiente);
+    if (!fotoBase || !pendiente) return;
+    const canvas = letterboxCuadrado(fotoBase, cropRect.x, cropRect.y, cropRect.w, cropRect.h);
+    const blob = await canvasABlob(canvas);
+    if (!blob || blob.size < 100) {
+      alert("El recorte salió vacío.");
+      return;
+    }
+    aplicarFoto(blob);
     pendiente = null;
+    fotoBase = null;
     indiceCola += 1;
     inputUnico = null;
     modoRevision(false);
     await siguienteAngulo();
   });
   document.getElementById("cam-repetir").addEventListener("click", () => {
-    if (document.getElementById("cam-preview")?.src) {
-      URL.revokeObjectURL(document.getElementById("cam-preview").src);
-    }
     pendiente = null;
+    fotoBase = null;
+    cropDrag = null;
     modoRevision(false);
   });
   document.getElementById("cam-saltar").addEventListener("click", async () => {

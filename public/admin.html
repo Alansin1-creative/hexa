@@ -94,18 +94,32 @@
         <video id="cam-video" autoplay playsinline muted></video>
         <div class="cam-frame" id="cam-frame" data-angulo="frente"></div>
         <div class="cam-review" id="cam-review" hidden>
-          <img id="cam-preview" alt="Recorte" />
+          <div class="crop-stage" id="crop-stage">
+            <canvas id="crop-view"></canvas>
+            <div class="crop-box" id="crop-box">
+              <i data-h="nw"></i><i data-h="n"></i><i data-h="ne"></i>
+              <i data-h="e"></i><i data-h="se"></i><i data-h="s"></i>
+              <i data-h="sw"></i><i data-h="w"></i>
+            </div>
+          </div>
         </div>
       </div>
       <canvas id="cam-canvas" hidden></canvas>
-      <p class="hint" id="cam-review-msg" hidden>Objeto recortado. Confirma o repite la toma.</p>
+      <p class="hint" id="cam-review-msg" hidden>Ajusta el recuadro al objeto y confirma.</p>
+      <div class="crop-tools" id="crop-tools" hidden>
+        <button type="button" class="ghost" id="crop-auto">Auto</button>
+        <button type="button" class="ghost" id="crop-1-1">1:1</button>
+        <button type="button" class="ghost" id="crop-4-3">4:3</button>
+        <button type="button" class="ghost" id="crop-libre">Libre</button>
+        <button type="button" class="ghost" id="crop-todo">Toda</button>
+      </div>
       <div class="qty" id="cam-acciones-live" style="margin-top: 12px;">
         <button type="button" class="btn" id="cam-capturar">Capturar</button>
         <button type="button" class="ghost" id="cam-saltar">Saltar</button>
         <button type="button" class="ghost" id="cam-cerrar">Cerrar</button>
       </div>
       <div class="qty" id="cam-acciones-review" hidden style="margin-top: 12px;">
-        <button type="button" class="btn" id="cam-usar">Usar esta foto</button>
+        <button type="button" class="btn" id="cam-usar">Usar recorte</button>
         <button type="button" class="ghost" id="cam-repetir">Repetir</button>
       </div>
     </div>
