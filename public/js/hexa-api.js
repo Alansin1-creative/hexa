@@ -326,7 +326,9 @@ async function siguientePedido() {
 
 const HexaAPI = {
   async vitrina() {
-    return (await listarProductos()).map(vitrinaDe).filter((p) => p.stock_total > 0);
+    return (await listarProductos())
+      .map(vitrinaDe)
+      .filter((p) => p.stock_total > 0 || p.estilos.some((e) => e.es_3d));
   },
   async vitrinaUno(id) {
     const p = vitrinaDe(await leerProducto(id));

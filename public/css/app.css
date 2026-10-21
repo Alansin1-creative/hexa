@@ -142,6 +142,10 @@ a.card:hover {
   border: 1px solid var(--line);
   padding: 5px 10px; border-radius: 999px; font-size: 12px;
 }
+.badge-agotado {
+  left: auto;
+  right: 12px;
+}
 .body { padding: 16px 16px 18px; display: grid; gap: 8px; }
 .meta { color: var(--muted); font-size: 13px; }
 .price { font-size: 20px; font-weight: 650; }

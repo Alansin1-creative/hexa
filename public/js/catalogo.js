@@ -33,6 +33,7 @@ function pintar() {
           <div class="thumb">
             ${img ? `<img src="${img}" alt="${p.nombre}" />` : `<span class="meta">Sin foto</span>`}
             <span class="badge">${hay3d ? "Modelo 3D" : "Galería 2D"}</span>
+            ${p.stock_total <= 0 ? `<span class="badge badge-agotado">Agotado</span>` : ""}
           </div>
           <div class="body">
             <div class="meta">${p.categoria} · ${p.estilos.length} estilo${p.estilos.length > 1 ? "s" : ""}</div>

@@ -41,7 +41,11 @@ function vitrinaDe(producto) {
 function registrarShop(app) {
   app.get("/api/vitrina", (_req, res) => {
     const ids = db.prepare("SELECT id FROM productos ORDER BY id DESC").all();
-    res.json(ids.map((row) => vitrinaDe(productoCompleto(row.id))).filter((p) => p.stock_total > 0));
+    res.json(
+      ids
+        .map((row) => vitrinaDe(productoCompleto(row.id)))
+        .filter((p) => p.stock_total > 0 || p.estilos.some((e) => e.es_3d))
+    );
   });
 
   app.get("/api/vitrina/:id", (req, res) => {
