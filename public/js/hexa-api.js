@@ -31,7 +31,30 @@ function db() {
 }
 function bucket() {
   exigirFirebase();
-  return firebase.storage();
+  const gs = `gs://${window.FIREBASE_CONFIG.projectId}.appspot.com`;
+  try {
+    return firebase.app().storage(gs);
+  } catch (_) {
+    return firebase.storage();
+  }
+}
+
+function mensajeStorage(err) {
+  const code = String(err?.code || "");
+  const server = String(err?.serverResponse || err?.customData?.serverResponse || err?.message || "");
+  if (code.includes("unauthorized") || server.includes("403")) {
+    return "Storage bloqueó la subida. En Firebase Console → Storage → Reglas deja: allow read, write: if true;";
+  }
+  if (code.includes("unauthenticated")) {
+    return "Storage pide sesión. En las reglas de Storage permite escritura sin login.";
+  }
+  if (code.includes("quota") || server.includes("quota")) {
+    return "Se llenó la cuota gratis de Storage.";
+  }
+  if (server.includes("404") || code.includes("object-not-found")) {
+    return "Storage no está creado. En Firebase Console abre Storage y pulsa Comenzar.";
+  }
+  return "No se pudieron subir las fotos a Storage. En Firebase Console abre Storage, pulsa Comenzar si no está activo, y publica reglas abiertas (allow read, write: if true).";
 }
 
 function nowIso() {
@@ -122,15 +145,52 @@ async function findEstilo(estiloId) {
   return null;
 }
 
+async function aJpeg(file) {
+  if (file.type === "image/jpeg" && file.size < 6 * 1024 * 1024) return file;
+  if (typeof createImageBitmap === "function") {
+    const bmp = await createImageBitmap(file);
+    const canvas = document.createElement("canvas");
+    canvas.width = bmp.width;
+    canvas.height = bmp.height;
+    canvas.getContext("2d").drawImage(bmp, 0, 0);
+    bmp.close?.();
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.88));
+    if (blob) return new File([blob], "foto.jpg", { type: "image/jpeg" });
+  }
+  return new File([file], "foto.jpg", { type: "image/jpeg" });
+}
+
+async function subirUno(prefijo, angulo, file) {
+  const jpeg = await aJpeg(file);
+  const path = `${prefijo}/${angulo}-${Date.now()}.jpg`;
+  const intentos = [
+    () => firebase.app().storage(`gs://${window.FIREBASE_CONFIG.projectId}.appspot.com`).ref(path),
+    () => firebase.storage().ref(path),
+  ];
+  let lastErr;
+  for (const refDe of intentos) {
+    try {
+      const ref = refDe();
+      await ref.put(jpeg, { contentType: "image/jpeg" });
+      return await ref.getDownloadURL();
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr;
+}
+
 async function subirAngulos(prefijo, form) {
   const urls = {};
-  for (const angulo of ANGULOS_API) {
-    const file =
-      form?._hexaFotos?.[angulo] || form?.querySelector(`input[name="${angulo}"]`)?.files?.[0];
-    if (!file) continue;
-    const ref = bucket().ref(`${prefijo}/${angulo}-${Date.now()}`);
-    await ref.put(file, { contentType: file.type || "image/jpeg" });
-    urls[angulo] = await ref.getDownloadURL();
+  try {
+    for (const angulo of ANGULOS_API) {
+      const file =
+        form?._hexaFotos?.[angulo] || form?.querySelector(`input[name="${angulo}"]`)?.files?.[0];
+      if (!file) continue;
+      urls[angulo] = await subirUno(prefijo, angulo, file);
+    }
+  } catch (err) {
+    throw new Error(mensajeStorage(err));
   }
   return urls;
 }
