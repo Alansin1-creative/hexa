@@ -1,5 +1,5 @@
 const GUIAS = {
-  frente: "Centra el objeto (caja, libro, empaque). Al capturar se recorta solo la figura y te pedimos confirmar.",
+  frente: "Centra el objeto. Captura o sube la foto; luego recortas y confirmas.",
   detras: "Gíralo 180°. La parte de atrás debe llenar el recuadro.",
   izquierda: "El costado izquierdo debe llenar el recuadro.",
   derecha: "El costado derecho debe llenar el recuadro.",
@@ -26,6 +26,7 @@ let fotoBase = null;
 let cropRect = { x: 80, y: 80, w: 864, h: 864 };
 let cropAspect = 0;
 let cropDrag = null;
+let origenToma = "camara";
 const FOTO_LADO = 1024;
 
 function fileInputDe(form, angulo) {
@@ -159,23 +160,30 @@ async function siguienteAngulo() {
   mostrarEstudio(angulo, `${indiceCola + 1} / ${colaAngulos.length}`);
 }
 
-async function iniciarEstudio({ form, angulos, input }) {
+function pedirGaleria() {
+  const pick = document.getElementById("cam-pick");
+  if (!pick) return;
+  pick.value = "";
+  pick.click();
+}
+
+function iniciarEstudio({ form, angulos, input, desde = "camara" }) {
   formDestino = form || input?.closest("form");
   inputUnico = input || null;
   colaAngulos = angulos;
   indiceCola = 0;
   pendiente = null;
-  try {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      throw new Error("Este navegador no permite cámara");
-    }
-    await abrirCamara();
-    await siguienteAngulo();
-  } catch (err) {
-    alert(err.message || "No se pudo abrir la cámara. Revisa el permiso (el navegador lo pide) o sube las fotos desde archivos.");
-    document.getElementById("estudio").hidden = true;
-    cerrarCamara();
+  fotoBase = null;
+  origenToma = desde;
+  const angulo = colaAngulos[0];
+  mostrarEstudio(angulo, `1 / ${colaAngulos.length}`);
+  if (desde === "archivo") {
+    pedirGaleria();
+    return;
   }
+  abrirCamara().catch((err) => {
+    alert(err.message || "No se pudo abrir la cámara. Usa Subir para elegir una foto del dispositivo.");
+  });
 }
 
 function mapaVideoCover() {
@@ -757,6 +765,45 @@ function capturarCuadro() {
   return tmp;
 }
 
+function archivoAFotoBase(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(img.src);
+      const c = document.createElement("canvas");
+      c.width = FOTO_LADO;
+      c.height = FOTO_LADO;
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = "#111";
+      ctx.fillRect(0, 0, FOTO_LADO, FOTO_LADO);
+      const scale = Math.min(FOTO_LADO / img.width, FOTO_LADO / img.height);
+      const dw = img.width * scale;
+      const dh = img.height * scale;
+      ctx.drawImage(img, (FOTO_LADO - dw) / 2, (FOTO_LADO - dh) / 2, dw, dh);
+      resolve(c);
+    };
+    img.onerror = () => reject(new Error("No se pudo leer la imagen"));
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+function entrarRevision(canvas) {
+  fotoBase = canvas;
+  pendiente = true;
+  const sugerido = sugerirCorte(canvas);
+  cropAspect = 0;
+  cropRect = clampCrop(sugerido.rect);
+  mostrarFotoBase();
+  marcarHerramienta();
+  const msg = document.getElementById("cam-review-msg");
+  if (msg) {
+    msg.textContent = sugerido.auto
+      ? "Ajusta el recuadro y confirma el recorte."
+      : "Mueve y estira el recuadro hasta cubrir solo el objeto.";
+  }
+  modoRevision(true);
+}
+
 function canvasABlob(canvas) {
   return new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/jpeg", 0.92));
 }
@@ -815,27 +862,31 @@ function cablearEstudio() {
     const btn = document.getElementById("cam-capturar");
     btn.disabled = true;
     try {
+      origenToma = "camara";
+      await abrirCamara();
       await esperarVideo(document.getElementById("cam-video"));
       const cuadro = capturarCuadro();
       if (!cuadro) throw new Error("Aún no hay imagen de la cámara");
-      fotoBase = cuadro;
-      pendiente = true;
-      const sugerido = sugerirCorte(cuadro);
-      cropAspect = 0;
-      cropRect = clampCrop(sugerido.rect);
-      mostrarFotoBase();
-      marcarHerramienta();
-      const msg = document.getElementById("cam-review-msg");
-      if (msg) {
-        msg.textContent = sugerido.auto
-          ? "Ajusta el recuadro (esquinas o Auto / 1:1) y confirma el recorte."
-          : "Mueve y estira el recuadro hasta cubrir solo el objeto.";
-      }
-      modoRevision(true);
+      entrarRevision(cuadro);
     } catch (err) {
-      alert(err.message || "No se pudo tomar la foto.");
+      alert(err.message || "No se pudo tomar la foto. Prueba Subir.");
     } finally {
       btn.disabled = false;
+    }
+  });
+  document.getElementById("cam-subir")?.addEventListener("click", () => {
+    origenToma = "archivo";
+    pedirGaleria();
+  });
+  document.getElementById("cam-pick")?.addEventListener("change", async () => {
+    const file = document.getElementById("cam-pick")?.files?.[0];
+    if (!file) return;
+    try {
+      origenToma = "archivo";
+      const cuadro = await archivoAFotoBase(file);
+      entrarRevision(cuadro);
+    } catch (err) {
+      alert(err.message || "No se pudo abrir esa foto.");
     }
   });
   document.getElementById("cam-usar").addEventListener("click", async () => {
@@ -859,6 +910,7 @@ function cablearEstudio() {
     fotoBase = null;
     cropDrag = null;
     modoRevision(false);
+    if (origenToma === "archivo" && !streamActual) pedirGaleria();
   });
   document.getElementById("cam-saltar").addEventListener("click", async () => {
     pendiente = null;

@@ -41,21 +41,8 @@ function montarAngulos(container, imagenes = {}) {
       </div>`
   ).join("");
   const form = container.closest("form");
-  container.querySelectorAll(".file-one").forEach((btn) => {
-    btn.addEventListener("click", (ev) => {
-      ev.stopPropagation();
-      form.querySelector(`input[name="${btn.dataset.angulo}"]`)?.click();
-    });
-  });
   container.querySelectorAll("input[type=file]").forEach((input) => {
-    input.addEventListener("change", () => {
-      const file = input.files?.[0];
-      if (file) {
-        guardarFotoLocal(form, input.getAttribute("name"), file);
-        previewEnSlot(input, URL.createObjectURL(file));
-      }
-      pintarProgreso(form);
-    });
+    input.addEventListener("change", () => pintarProgreso(form));
   });
   container.querySelectorAll(".cam-one").forEach((btn) => {
     btn.addEventListener("click", (ev) => {
@@ -64,6 +51,18 @@ function montarAngulos(container, imagenes = {}) {
         form,
         angulos: [btn.dataset.angulo],
         input: form.querySelector(`input[name="${btn.dataset.angulo}"]`),
+        desde: "camara",
+      });
+    });
+  });
+  container.querySelectorAll(".file-one").forEach((btn) => {
+    btn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      iniciarEstudio({
+        form,
+        angulos: [btn.dataset.angulo],
+        input: form.querySelector(`input[name="${btn.dataset.angulo}"]`),
+        desde: "archivo",
       });
     });
   });
