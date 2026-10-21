@@ -100,6 +100,7 @@
           <div class="crop-stage" id="crop-stage">
             <canvas id="crop-view"></canvas>
             <div class="crop-box" id="crop-box">
+              <span class="crop-grid" id="crop-grid-lines"></span>
               <i data-h="nw"></i><i data-h="n"></i><i data-h="ne"></i>
               <i data-h="e"></i><i data-h="se"></i><i data-h="s"></i>
               <i data-h="sw"></i><i data-h="w"></i>
@@ -112,9 +113,17 @@
       <div class="crop-tools" id="crop-tools" hidden>
         <button type="button" class="ghost" id="crop-auto">Auto</button>
         <button type="button" class="ghost" id="crop-1-1">1:1</button>
+        <button type="button" class="ghost" id="crop-3-4">3:4</button>
         <button type="button" class="ghost" id="crop-4-3">4:3</button>
+        <button type="button" class="ghost" id="crop-16-9">16:9</button>
         <button type="button" class="ghost" id="crop-libre">Libre</button>
         <button type="button" class="ghost" id="crop-todo">Toda</button>
+        <button type="button" class="ghost" id="crop-menos" title="Alejar">−</button>
+        <button type="button" class="ghost" id="crop-mas" title="Acercar">+</button>
+        <button type="button" class="ghost" id="crop-rot-izq" title="Girar izquierda">↺</button>
+        <button type="button" class="ghost" id="crop-rot-der" title="Girar derecha">↻</button>
+        <button type="button" class="ghost" id="crop-reset" title="Centrar vista">Centrar</button>
+        <button type="button" class="ghost on" id="crop-grid">Guía</button>
       </div>
       <input class="file-oculto" id="cam-pick" type="file" accept="image/*" />
       <div class="qty" id="cam-acciones-live" style="margin-top: 12px;">

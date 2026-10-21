@@ -23,13 +23,19 @@ let formDestino = null;
 let inputUnico = null;
 let pendiente = null;
 let fotoBase = null;
-let cropRect = { x: 80, y: 80, w: 864, h: 864 };
+let cropRect = { x: 12, y: 12, w: 76, h: 76 };
 let cropAspect = 0;
 let cropDrag = null;
+let cropZoom = 1;
+let cropPan = { x: 0, y: 0 };
+let cropRot = 0;
+let cropGrid = true;
+let cropPointers = new Map();
 let origenToma = "camara";
 let ultimoAutoRect = null;
 const FOTO_LADO = 1024;
 const CROP_MEM = "hexa-crop-memoria";
+const CROP_MIN = 6;
 
 function fileInputDe(form, angulo) {
   return form?.querySelector(`input[name="${angulo}"]`);
@@ -124,6 +130,14 @@ function cerrarCamara() {
   pendiente = null;
   fotoBase = null;
   cropDrag = null;
+  cropPointers.clear();
+  resetVistaCrop();
+}
+
+function resetVistaCrop() {
+  cropZoom = 1;
+  cropPan = { x: 0, y: 0 };
+  cropRot = 0;
 }
 
 function modoRevision(on) {
@@ -730,42 +744,132 @@ function bboxObjeto(srcCanvas) {
   };
 }
 
-function letterboxCuadrado(src, x, y, w, h) {
+function tamanoVistaCrop() {
+  const stage = document.getElementById("crop-stage");
+  const r = stage?.getBoundingClientRect();
+  const css = Math.max(120, Math.round(r?.width || 320));
+  const lado = Math.max(720, Math.round(css * (window.devicePixelRatio || 1)));
+  return { css, lado };
+}
+
+function layoutVista(sw, sh) {
+  const imgW = fotoBase.width;
+  const imgH = fotoBase.height;
+  const fit = Math.min(sw / imgW, sh / imgH);
+  const scale = fit * cropZoom;
+  return {
+    sw,
+    sh,
+    imgW,
+    imgH,
+    scale,
+    cx: sw / 2,
+    cy: sh / 2,
+    rot: (cropRot * Math.PI) / 180,
+  };
+}
+
+function canvasToImage(sx, sy, sw = 100, sh = 100) {
+  const v = layoutVista(sw, sh);
+  let x = sx - v.cx;
+  let y = sy - v.cy;
+  const c = Math.cos(-v.rot);
+  const s = Math.sin(-v.rot);
+  const rx = x * c - y * s;
+  const ry = x * s + y * c;
+  return {
+    x: rx / v.scale + v.imgW / 2 + cropPan.x,
+    y: ry / v.scale + v.imgH / 2 + cropPan.y,
+  };
+}
+
+function recorteVistaAImagen() {
+  const pts = [
+    canvasToImage(cropRect.x, cropRect.y),
+    canvasToImage(cropRect.x + cropRect.w, cropRect.y),
+    canvasToImage(cropRect.x, cropRect.y + cropRect.h),
+    canvasToImage(cropRect.x + cropRect.w, cropRect.y + cropRect.h),
+  ];
+  const xs = pts.map((p) => p.x);
+  const ys = pts.map((p) => p.y);
+  const x = Math.min(...xs);
+  const y = Math.min(...ys);
+  return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
+}
+
+function dibujarVistaEn(ctx, sw, sh) {
+  const v = layoutVista(sw, sh);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = "#111";
+  ctx.fillRect(0, 0, sw, sh);
+  ctx.translate(v.cx, v.cy);
+  ctx.rotate(v.rot);
+  ctx.scale(v.scale, v.scale);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(fotoBase, -v.imgW / 2 - cropPan.x, -v.imgH / 2 - cropPan.y);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+}
+
+function pintarCropVista() {
+  const view = document.getElementById("crop-view");
+  if (!view || !fotoBase) return;
+  const { lado } = tamanoVistaCrop();
+  if (view.width !== lado || view.height !== lado) {
+    view.width = lado;
+    view.height = lado;
+  }
+  dibujarVistaEn(view.getContext("2d"), view.width, view.height);
+  pintarCropBox();
+}
+
+function extraerRecorte() {
+  if (!fotoBase) return null;
+  const { lado } = tamanoVistaCrop();
+  const hi = Math.max(lado, 1400);
+  const tmp = document.createElement("canvas");
+  tmp.width = hi;
+  tmp.height = hi;
+  dibujarVistaEn(tmp.getContext("2d"), hi, hi);
+  const x = (cropRect.x / 100) * hi;
+  const y = (cropRect.y / 100) * hi;
+  const w = (cropRect.w / 100) * hi;
+  const h = (cropRect.h / 100) * hi;
   const max = FOTO_LADO;
-  const scale = Math.min(max / Math.max(w, 1), max / Math.max(h, 1), 1);
-  const dw = Math.max(1, Math.round(w * scale));
-  const dh = Math.max(1, Math.round(h * scale));
+  const k = Math.min(max / Math.max(w, 1), max / Math.max(h, 1), 1);
+  const dw = Math.max(8, Math.round(w * k));
+  const dh = Math.max(8, Math.round(h * k));
   const canvas = document.getElementById("cam-canvas");
   canvas.width = dw;
   canvas.height = dh;
   const ctx = canvas.getContext("2d");
   ctx.imageSmoothingEnabled = true;
-  ctx.drawImage(src, x, y, w, h, 0, 0, dw, dh);
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(tmp, x, y, w, h, 0, 0, dw, dh);
   return canvas;
 }
 
 function clampCrop(r) {
-  const S = FOTO_LADO;
-  const min = 48;
+  const min = CROP_MIN;
   let { x, y, w, h } = r;
-  w = Math.max(min, Math.min(S, w));
-  h = Math.max(min, Math.min(S, h));
+  w = Math.max(min, Math.min(100, w));
+  h = Math.max(min, Math.min(100, h));
   if (cropAspect) {
     if (w / h > cropAspect) w = h * cropAspect;
     else h = w / cropAspect;
-    if (w > S) {
-      w = S;
+    if (w > 100) {
+      w = 100;
       h = w / cropAspect;
     }
-    if (h > S) {
-      h = S;
+    if (h > 100) {
+      h = 100;
       w = h * cropAspect;
     }
     w = Math.max(min, w);
     h = Math.max(min, h);
   }
-  x = Math.max(0, Math.min(S - w, x));
-  y = Math.max(0, Math.min(S - h, y));
+  x = Math.max(0, Math.min(100 - w, x));
+  y = Math.max(0, Math.min(100 - h, y));
   return { x, y, w, h };
 }
 
@@ -792,30 +896,43 @@ function marcarHerramienta() {
   const ids = {
     "crop-libre": cropAspect === 0,
     "crop-1-1": cropAspect === 1,
+    "crop-3-4": cropAspect === 3 / 4,
     "crop-4-3": cropAspect === 4 / 3,
+    "crop-16-9": cropAspect === 16 / 9,
   };
   Object.entries(ids).forEach(([id, on]) => {
     document.getElementById(id)?.classList.toggle("on", on);
   });
+  document.getElementById("crop-grid")?.classList.toggle("on", cropGrid);
+  document.getElementById("crop-box")?.classList.toggle("con-guia", cropGrid);
 }
 
 function pintarCropBox() {
   const box = document.getElementById("crop-box");
   if (!box) return;
-  const p = (n) => `${(n / FOTO_LADO) * 100}%`;
-  box.style.left = p(cropRect.x);
-  box.style.top = p(cropRect.y);
-  box.style.width = p(cropRect.w);
-  box.style.height = p(cropRect.h);
+  box.style.left = `${cropRect.x}%`;
+  box.style.top = `${cropRect.y}%`;
+  box.style.width = `${cropRect.w}%`;
+  box.style.height = `${cropRect.h}%`;
 }
 
 function mostrarFotoBase() {
-  const view = document.getElementById("crop-view");
-  if (!view || !fotoBase) return;
-  view.width = FOTO_LADO;
-  view.height = FOTO_LADO;
-  view.getContext("2d").drawImage(fotoBase, 0, 0);
-  pintarCropBox();
+  pintarCropVista();
+}
+
+function acercarVista(factor, cx = 50, cy = 50) {
+  if (!fotoBase) return;
+  const prev = canvasToImage(cx, cy);
+  cropZoom = Math.max(0.5, Math.min(8, cropZoom * factor));
+  const next = canvasToImage(cx, cy);
+  cropPan.x += prev.x - next.x;
+  cropPan.y += prev.y - next.y;
+  pintarCropVista();
+}
+
+function girarVista(grados) {
+  cropRot = (cropRot + grados) % 360;
+  pintarCropVista();
 }
 
 function leerMemoriaCrop() {
@@ -857,14 +974,40 @@ function aplicarMemoriaCrop(rect) {
   return { x: cx - w / 2, y: cy - h / 2, w, h };
 }
 
+function rectImagenAVista(rect) {
+  if (!fotoBase) return { x: 12, y: 12, w: 76, h: 76 };
+  const v = layoutVista(1000, 1000);
+  const c = Math.cos(v.rot);
+  const s = Math.sin(v.rot);
+  const toVista = (ix, iy) => {
+    const x = (ix - v.imgW / 2 - cropPan.x) * v.scale;
+    const y = (iy - v.imgH / 2 - cropPan.y) * v.scale;
+    return { x: v.cx + x * c - y * s, y: v.cy + x * s + y * c };
+  };
+  const pts = [
+    toVista(rect.x, rect.y),
+    toVista(rect.x + rect.w, rect.y),
+    toVista(rect.x, rect.y + rect.h),
+    toVista(rect.x + rect.w, rect.y + rect.h),
+  ];
+  const xs = pts.map((p) => p.x);
+  const ys = pts.map((p) => p.y);
+  const x = Math.min(...xs) / 10;
+  const y = Math.min(...ys) / 10;
+  const x2 = Math.max(...xs) / 10;
+  const y2 = Math.max(...ys) / 10;
+  return { x, y, w: x2 - x, h: y2 - y };
+}
+
 function sugerirCorte(canvas) {
   const caja = bboxObjeto(canvas);
-  const areaOk = caja && caja.w > 48 && caja.h > 48 && caja.w * caja.h < 0.82 * FOTO_LADO * FOTO_LADO;
+  const area = canvas.width * canvas.height;
+  const areaOk = caja && caja.w > 48 && caja.h > 48 && caja.w * caja.h < 0.82 * area;
   if (areaOk) {
     const rect = aplicarMemoriaCrop(caja);
-    return { rect, auto: true, crudo: caja };
+    return { rect: rectImagenAVista(rect), auto: true, crudo: caja };
   }
-  return { rect: { x: 72, y: 72, w: 880, h: 880 }, auto: false, crudo: null };
+  return { rect: { x: 10, y: 10, w: 80, h: 80 }, auto: false, crudo: null };
 }
 
 function aplicarAutoCorte() {
@@ -873,13 +1016,13 @@ function aplicarAutoCorte() {
   const { rect, auto, crudo } = sugerirCorte(fotoBase);
   ultimoAutoRect = crudo || rect;
   cropRect = clampCrop(rect);
-  pintarCropBox();
+  pintarCropVista();
   marcarHerramienta();
   const msg = document.getElementById("cam-review-msg");
   if (msg) {
     msg.textContent = auto
-      ? "Sugerencia automática. Arrastra las esquinas para ajustar."
-      : "No se aisló solo. Ajusta el recuadro a mano.";
+      ? "Sugerencia automática. Mueve el recuadro, pellizca para zoom o gira la foto."
+      : "No se aisló solo. Arrastra el recuadro o la foto para ajustar.";
   }
 }
 
@@ -888,8 +1031,8 @@ function puntoEnFoto(e) {
   const r = stage.getBoundingClientRect();
   const t = e.touches ? e.touches[0] : e;
   return {
-    x: ((t.clientX - r.left) / r.width) * FOTO_LADO,
-    y: ((t.clientY - r.top) / r.height) * FOTO_LADO,
+    x: ((t.clientX - r.left) / r.width) * 100,
+    y: ((t.clientY - r.top) / r.height) * 100,
   };
 }
 
@@ -910,13 +1053,13 @@ function moverCrop(h, start, dx, dy) {
     y = start.y + dy;
     ht = start.h - dy;
   }
-  if (w < 48) {
-    if (h.includes("w")) x = start.x + start.w - 48;
-    w = 48;
+  if (w < CROP_MIN) {
+    if (h.includes("w")) x = start.x + start.w - CROP_MIN;
+    w = CROP_MIN;
   }
-  if (ht < 48) {
-    if (h.includes("n")) y = start.y + start.h - 48;
-    ht = 48;
+  if (ht < CROP_MIN) {
+    if (h.includes("n")) y = start.y + start.h - CROP_MIN;
+    ht = CROP_MIN;
   }
   if (cropAspect) {
     if (h === "n" || h === "s") w = ht * cropAspect;
@@ -957,16 +1100,14 @@ function archivoAFotoBase(file) {
     const img = new Image();
     img.onload = () => {
       URL.revokeObjectURL(img.src);
+      const max = 1600;
+      const scale = Math.min(1, max / Math.max(img.width, img.height));
       const c = document.createElement("canvas");
-      c.width = FOTO_LADO;
-      c.height = FOTO_LADO;
+      c.width = Math.max(1, Math.round(img.width * scale));
+      c.height = Math.max(1, Math.round(img.height * scale));
       const ctx = c.getContext("2d");
-      ctx.fillStyle = "#111";
-      ctx.fillRect(0, 0, FOTO_LADO, FOTO_LADO);
-      const scale = Math.min(FOTO_LADO / img.width, FOTO_LADO / img.height);
-      const dw = img.width * scale;
-      const dh = img.height * scale;
-      ctx.drawImage(img, (FOTO_LADO - dw) / 2, (FOTO_LADO - dh) / 2, dw, dh);
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(img, 0, 0, c.width, c.height);
       resolve(c);
     };
     img.onerror = () => reject(new Error("No se pudo leer la imagen"));
@@ -977,11 +1118,12 @@ function archivoAFotoBase(file) {
 function entrarRevision(canvas) {
   fotoBase = canvas;
   pendiente = true;
+  resetVistaCrop();
   let sugerido;
   try {
     sugerido = sugerirCorte(canvas);
   } catch (_) {
-    sugerido = { rect: { x: 72, y: 72, w: 880, h: 880 }, auto: false, crudo: null };
+    sugerido = { rect: { x: 10, y: 10, w: 80, h: 80 }, auto: false, crudo: null };
   }
   ultimoAutoRect = sugerido.crudo || sugerido.rect;
   cropAspect = 0;
@@ -991,10 +1133,8 @@ function entrarRevision(canvas) {
   const msg = document.getElementById("cam-review-msg");
   if (msg) {
     msg.textContent = sugerido.auto
-      ? leerMemoriaCrop().n >= 2
-        ? "Ajusta si hace falta. HEXA afina el recorte con tus confirmaciones."
-        : "Ajusta el recuadro y confirma el recorte."
-      : "Mueve y estira el recuadro hasta cubrir solo el objeto.";
+      ? "Arrastra el recuadro, mueve la foto, pellizca o gira. Las flechas afinan el corte."
+      : "Mueve el recuadro o la foto. Usa +/− para acercar y ↺↻ para girar.";
   }
   modoRevision(true);
 }
@@ -1021,38 +1161,137 @@ function cablearEstudio() {
   modal.dataset.ready = "1";
   const stage = document.getElementById("crop-stage");
   const box = document.getElementById("crop-box");
+  const distanciaPunteros = () => {
+    const pts = [...cropPointers.values()];
+    if (pts.length < 2) return 0;
+    const dx = pts[0].x - pts[1].x;
+    const dy = pts[0].y - pts[1].y;
+    return Math.hypot(dx, dy);
+  };
+  const centroPunteros = () => {
+    const pts = [...cropPointers.values()];
+    return { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
+  };
   const onMove = (e) => {
+    if (!fotoBase) return;
+    if (cropPointers.has(e.pointerId)) cropPointers.set(e.pointerId, puntoEnFoto(e));
+    if (cropPointers.size >= 2 && cropDrag?.tipo === "pinch") {
+      e.preventDefault();
+      const dist = distanciaPunteros();
+      if (cropDrag.dist > 8 && dist > 8) {
+        const c = centroPunteros();
+        acercarVista(dist / cropDrag.dist, c.x, c.y);
+        cropDrag.dist = dist;
+      }
+      return;
+    }
     if (!cropDrag) return;
     e.preventDefault();
     const p = puntoEnFoto(e);
+    if (cropDrag.tipo === "pan") {
+      const v = layoutVista(100, 100);
+      const dx = p.x - cropDrag.x;
+      const dy = p.y - cropDrag.y;
+      const c = Math.cos(-v.rot);
+      const s = Math.sin(-v.rot);
+      const ix = dx / v.scale;
+      const iy = dy / v.scale;
+      cropPan.x -= ix * c - iy * s;
+      cropPan.y -= ix * s + iy * c;
+      cropDrag.x = p.x;
+      cropDrag.y = p.y;
+      pintarCropVista();
+      return;
+    }
     cropRect = moverCrop(cropDrag.h, cropDrag.start, p.x - cropDrag.x, p.y - cropDrag.y);
     pintarCropBox();
   };
-  const onUp = () => {
-    cropDrag = null;
+  const onUp = (e) => {
+    cropPointers.delete(e.pointerId);
+    if (cropPointers.size < 2 && cropDrag?.tipo === "pinch") cropDrag = null;
+    if (!cropPointers.size) {
+      cropDrag = null;
+      stage?.classList.remove("is-drag");
+    }
   };
   stage?.addEventListener("pointerdown", (e) => {
     if (!fotoBase) return;
-    const h = e.target.dataset.h || (e.target === box || box.contains(e.target) ? "move" : "");
-    if (!h) return;
     const p = puntoEnFoto(e);
-    cropDrag = { h, x: p.x, y: p.y, start: { ...cropRect } };
-    stage.setPointerCapture?.(e.pointerId);
+    cropPointers.set(e.pointerId, p);
+    if (cropPointers.size >= 2) {
+      cropDrag = { tipo: "pinch", dist: distanciaPunteros() };
+      e.preventDefault();
+      return;
+    }
+    const h = e.target.dataset.h || (e.target === box || box.contains(e.target) ? "move" : "pan");
+    cropDrag = { tipo: h === "pan" ? "pan" : "box", h, x: p.x, y: p.y, start: { ...cropRect } };
+    stage.classList.add("is-drag");
     e.preventDefault();
   });
   stage?.addEventListener("pointermove", onMove);
   stage?.addEventListener("pointerup", onUp);
   stage?.addEventListener("pointercancel", onUp);
+  window.addEventListener("pointermove", onMove);
+  window.addEventListener("pointerup", onUp);
+  window.addEventListener("pointercancel", onUp);
+  stage?.addEventListener(
+    "wheel",
+    (e) => {
+      if (!fotoBase) return;
+      e.preventDefault();
+      const p = puntoEnFoto(e);
+      acercarVista(e.deltaY < 0 ? 1.12 : 1 / 1.12, p.x, p.y);
+    },
+    { passive: false }
+  );
   document.getElementById("crop-auto")?.addEventListener("click", aplicarAutoCorte);
   document.getElementById("crop-1-1")?.addEventListener("click", () => forzarAspecto(1));
+  document.getElementById("crop-3-4")?.addEventListener("click", () => forzarAspecto(3 / 4));
   document.getElementById("crop-4-3")?.addEventListener("click", () => forzarAspecto(4 / 3));
+  document.getElementById("crop-16-9")?.addEventListener("click", () => forzarAspecto(16 / 9));
   document.getElementById("crop-libre")?.addEventListener("click", () => forzarAspecto(0));
   document.getElementById("crop-todo")?.addEventListener("click", () => {
     cropAspect = 0;
-    cropRect = { x: 0, y: 0, w: FOTO_LADO, h: FOTO_LADO };
+    cropRect = { x: 0, y: 0, w: 100, h: 100 };
     pintarCropBox();
     marcarHerramienta();
   });
+  document.getElementById("crop-menos")?.addEventListener("click", () => acercarVista(1 / 1.2));
+  document.getElementById("crop-mas")?.addEventListener("click", () => acercarVista(1.2));
+  document.getElementById("crop-rot-izq")?.addEventListener("click", () => girarVista(-15));
+  document.getElementById("crop-rot-der")?.addEventListener("click", () => girarVista(15));
+  document.getElementById("crop-reset")?.addEventListener("click", () => {
+    resetVistaCrop();
+    pintarCropVista();
+  });
+  document.getElementById("crop-grid")?.addEventListener("click", () => {
+    cropGrid = !cropGrid;
+    marcarHerramienta();
+  });
+  window.addEventListener("keydown", (e) => {
+    if (!fotoBase || !pendiente) return;
+    const paso = e.shiftKey ? 2.4 : 0.6;
+    if (e.key === "ArrowLeft") {
+      cropRect = clampCrop({ ...cropRect, x: cropRect.x - paso });
+    } else if (e.key === "ArrowRight") {
+      cropRect = clampCrop({ ...cropRect, x: cropRect.x + paso });
+    } else if (e.key === "ArrowUp") {
+      cropRect = clampCrop({ ...cropRect, y: cropRect.y - paso });
+    } else if (e.key === "ArrowDown") {
+      cropRect = clampCrop({ ...cropRect, y: cropRect.y + paso });
+    } else if (e.key === "+" || e.key === "=") {
+      acercarVista(1.12);
+      return;
+    } else if (e.key === "-" || e.key === "_") {
+      acercarVista(1 / 1.12);
+      return;
+    } else return;
+    e.preventDefault();
+    pintarCropBox();
+  });
+  new ResizeObserver(() => {
+    if (fotoBase) pintarCropVista();
+  }).observe(stage || document.body);
   document.getElementById("cam-capturar").addEventListener("click", async () => {
     const btn = document.getElementById("cam-capturar");
     btn.disabled = true;
@@ -1086,13 +1325,13 @@ function cablearEstudio() {
   });
   document.getElementById("cam-usar").addEventListener("click", async () => {
     if (!fotoBase || !pendiente) return;
-    const canvas = letterboxCuadrado(fotoBase, cropRect.x, cropRect.y, cropRect.w, cropRect.h);
+    const canvas = extraerRecorte();
     const blob = await canvasABlob(canvas);
     if (!blob || blob.size < 100) {
       alert("El recorte salió vacío.");
       return;
     }
-    recordarAjusteCrop(ultimoAutoRect, cropRect);
+    recordarAjusteCrop(ultimoAutoRect, recorteVistaAImagen());
     aplicarFoto(blob);
     pendiente = null;
     fotoBase = null;

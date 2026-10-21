@@ -1,4 +1,4 @@
-const CACHE = "hexa-v6";
+const CACHE = "hexa-v7";
 const APP_SHELL = [
   "/",
   "/admin.html",
