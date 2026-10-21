@@ -731,20 +731,16 @@ function bboxObjeto(srcCanvas) {
 }
 
 function letterboxCuadrado(src, x, y, w, h) {
-  const out = FOTO_LADO;
+  const max = FOTO_LADO;
+  const scale = Math.min(max / Math.max(w, 1), max / Math.max(h, 1), 1);
+  const dw = Math.max(1, Math.round(w * scale));
+  const dh = Math.max(1, Math.round(h * scale));
   const canvas = document.getElementById("cam-canvas");
-  canvas.width = out;
-  canvas.height = out;
+  canvas.width = dw;
+  canvas.height = dh;
   const ctx = canvas.getContext("2d");
-  ctx.fillStyle = "#111";
-  ctx.fillRect(0, 0, out, out);
-  const scale = Math.min(out / w, out / h);
-  const dw = w * scale;
-  const dh = h * scale;
-  const dx = (out - dw) / 2;
-  const dy = (out - dh) / 2;
   ctx.imageSmoothingEnabled = true;
-  ctx.drawImage(src, x, y, w, h, dx, dy, dw, dh);
+  ctx.drawImage(src, x, y, w, h, 0, 0, dw, dh);
   return canvas;
 }
 

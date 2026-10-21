@@ -11,42 +11,90 @@ function destruirVisor() {
   escenaActiva = null;
 }
 
-function recorteLetra(img) {
+function bboxLetra(img) {
   const iw = img.naturalWidth || img.width;
   const ih = img.naturalHeight || img.height;
-  if (!iw || !ih) return { w: 1, h: 1 };
+  if (!iw || !ih) return { x: 0, y: 0, w: 1, h: 1 };
+  const tw = 240;
+  const th = Math.max(80, Math.round((ih * tw) / iw));
+  const c = document.createElement("canvas");
+  c.width = tw;
+  c.height = th;
+  const ctx = c.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0, tw, th);
+  const { data } = ctx.getImageData(0, 0, tw, th);
+  const esPad = (i) => {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+    const lum = r * 0.299 + g * 0.587 + b * 0.114;
+    const gris = Math.max(r, g, b) - Math.min(r, g, b);
+    return lum < 42 && gris < 28;
+  };
+  const filaPad = (y) => {
+    let n = 0;
+    for (let x = 0; x < tw; x += 2) if (esPad((y * tw + x) * 4)) n++;
+    return n / Math.ceil(tw / 2) > 0.82;
+  };
+  const colPad = (x) => {
+    let n = 0;
+    for (let y = 0; y < th; y += 2) if (esPad((y * tw + x) * 4)) n++;
+    return n / Math.ceil(th / 2) > 0.82;
+  };
+  let y0 = 0;
+  let y1 = th - 1;
+  let x0 = 0;
+  let x1 = tw - 1;
+  while (y0 < y1 - 6 && filaPad(y0)) y0++;
+  while (y1 > y0 + 6 && filaPad(y1)) y1--;
+  while (x0 < x1 - 6 && colPad(x0)) x0++;
+  while (x1 > x0 + 6 && colPad(x1)) x1--;
+  const padX = Math.max(1, Math.round((x1 - x0) * 0.008));
+  const padY = Math.max(1, Math.round((y1 - y0) * 0.008));
+  x0 = Math.min(x1 - 4, x0 + padX);
+  y0 = Math.min(y1 - 4, y0 + padY);
+  x1 = Math.max(x0 + 4, x1 - padX);
+  y1 = Math.max(y0 + 4, y1 - padY);
+  return {
+    x: (x0 / tw) * iw,
+    y: (y0 / th) * ih,
+    w: ((x1 - x0 + 1) / tw) * iw,
+    h: ((y1 - y0 + 1) / th) * ih,
+  };
+}
+
+function recortarACanvas(img, box) {
+  const c = document.createElement("canvas");
+  c.width = Math.max(8, Math.round(box.w));
+  c.height = Math.max(8, Math.round(box.h));
+  c.getContext("2d").drawImage(img, box.x, box.y, box.w, box.h, 0, 0, c.width, c.height);
+  c.className = "hexa-tex";
+  return c;
+}
+
+function cargarImagen(url, cors) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    if (cors) img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("img"));
+    img.src = url;
+  });
+}
+
+async function cargarCara(url) {
+  let img = null;
   try {
-    const tw = 200;
-    const th = Math.max(80, Math.round((ih * tw) / iw));
-    const c = document.createElement("canvas");
-    c.width = tw;
-    c.height = th;
-    const ctx = c.getContext("2d", { willReadFrequently: true });
-    ctx.drawImage(img, 0, 0, tw, th);
-    const { data } = ctx.getImageData(0, 0, tw, th);
-    const dist = (i) => Math.abs(data[i] - data[0]) + Math.abs(data[i + 1] - data[1]) + Math.abs(data[i + 2] - data[2]);
-    const filaFondo = (y) => {
-      let n = 0;
-      for (let x = 0; x < tw; x += 2) if (dist((y * tw + x) * 4) < 36) n++;
-      return n / Math.ceil(tw / 2) > 0.9;
-    };
-    const colFondo = (x) => {
-      let n = 0;
-      for (let y = 0; y < th; y += 2) if (dist((y * tw + x) * 4) < 36) n++;
-      return n / Math.ceil(th / 2) > 0.9;
-    };
-    let y0 = 0;
-    let y1 = th - 1;
-    let x0 = 0;
-    let x1 = tw - 1;
-    while (y0 < y1 - 8 && filaFondo(y0)) y0++;
-    while (y1 > y0 + 8 && filaFondo(y1)) y1--;
-    while (x0 < x1 - 8 && colFondo(x0)) x0++;
-    while (x1 > x0 + 8 && colFondo(x1)) x1--;
-    return { w: Math.max(8, x1 - x0 + 1), h: Math.max(8, y1 - y0 + 1) };
-  } catch (_) {
-    return { w: iw, h: ih };
+    img = await cargarImagen(url, true);
+  } catch {
+    const res = await fetch(url, { mode: "cors" });
+    if (!res.ok) throw new Error("foto");
+    img = await createImageBitmap(await res.blob());
   }
+  const box = bboxLetra(img);
+  const canvas = recortarACanvas(img, box);
+  img.close?.();
+  return { canvas, w: canvas.width, h: canvas.height };
 }
 
 function dimensionesDeMedidas(m) {
@@ -91,19 +139,18 @@ function iniciarVisor(contenedor, imagenes) {
     face.className = `hexa-face hexa-${angulo}`;
     const url = imagenes?.[angulo];
     if (url) {
-      const img = document.createElement("img");
-      img.alt = angulo;
-      img.decoding = "async";
-      img.onload = () => {
-        try {
-          medidas[angulo] = recorteLetra(img);
-        } catch (_) {
-          medidas[angulo] = { w: img.naturalWidth || 1, h: img.naturalHeight || 1 };
-        }
-        aplicarTamano();
-      };
-      img.src = url;
-      face.appendChild(img);
+      cargarCara(url)
+        .then(({ canvas, w, h }) => {
+          face.appendChild(canvas);
+          medidas[angulo] = { w, h };
+          aplicarTamano();
+        })
+        .catch(() => {
+          const img = document.createElement("img");
+          img.alt = angulo;
+          img.src = url;
+          face.appendChild(img);
+        });
     }
     cube.appendChild(face);
   });
