@@ -10,6 +10,17 @@ function exigirFirebase() {
   throw new Error("Falta la config de Firebase. Ábrela en /js/firebase-config.js");
 }
 
+function errorHexa(err) {
+  const code = String(err?.code || "");
+  const msg = String(err?.message || err || "");
+  if (code.includes("permission-denied") || /insufficient permissions/i.test(msg)) {
+    return new Error(
+      "Firestore bloqueó el guardado. En Firebase Console → Firestore Database → Reglas publica: allow read, write: if true;"
+    );
+  }
+  return err instanceof Error ? err : new Error(msg);
+}
+
 (function initFirebase() {
   if (!firebaseListo()) {
     document.addEventListener("DOMContentLoaded", () => {
@@ -195,6 +206,52 @@ async function subirAngulos(prefijo, form) {
   return urls;
 }
 
+async function crearProductoInterno(form) {
+  const fd = new FormData(form);
+  const nombre = String(fd.get("nombre") || "").trim();
+  const costoNum = Number(fd.get("costo"));
+  const ventaNum = Number(fd.get("precio_venta"));
+  const stockNum = Number.parseInt(fd.get("stock"), 10);
+  if (!nombre) throw new Error("El nombre es obligatorio");
+  if (!Number.isFinite(costoNum) || costoNum < 0) throw new Error("Costo inválido");
+  if (!Number.isFinite(ventaNum) || ventaNum < 0) throw new Error("Precio de venta inválido");
+  if (!Number.isInteger(stockNum) || stockNum < 0) throw new Error("Stock inválido");
+  const estiloId = uid();
+  const imagenes = await subirAngulos(`estilos/${estiloId}`, form);
+  const estilo = {
+    id: estiloId,
+    nombre: String(fd.get("estilo_nombre") || "Clásico").trim(),
+    color_hex: fd.get("color_hex") || "#c4a574",
+    costo: costoNum,
+    precio_venta: ventaNum,
+    stock: stockNum,
+    imagenes,
+  };
+  const ref = await db().collection("productos").add({
+    nombre,
+    descripcion: String(fd.get("descripcion") || "").trim(),
+    categoria: String(fd.get("categoria") || "General").trim(),
+    creado_en: nowIso(),
+    actualizado_en: nowIso(),
+    estilos: [estilo],
+  });
+  if (stockNum > 0) {
+    await db().collection("movimientos").add({
+      estilo_id: estiloId,
+      tipo: "entrada",
+      cantidad: stockNum,
+      costo_unitario: costoNum,
+      precio_unitario: null,
+      ganancia: 0,
+      nota: "Stock inicial",
+      producto: nombre,
+      estilo: estilo.nombre,
+      creado_en: nowIso(),
+    });
+  }
+  return leerProducto(ref.id);
+}
+
 async function siguientePedido() {
   const ref = db().collection("meta").doc("contadores");
   return db().runTransaction(async (tx) => {
@@ -218,49 +275,11 @@ const HexaAPI = {
     return listarProductos();
   },
   async crearProducto(form) {
-    const fd = new FormData(form);
-    const nombre = String(fd.get("nombre") || "").trim();
-    const costoNum = Number(fd.get("costo"));
-    const ventaNum = Number(fd.get("precio_venta"));
-    const stockNum = Number.parseInt(fd.get("stock"), 10);
-    if (!nombre) throw new Error("El nombre es obligatorio");
-    if (!Number.isFinite(costoNum) || costoNum < 0) throw new Error("Costo inválido");
-    if (!Number.isFinite(ventaNum) || ventaNum < 0) throw new Error("Precio de venta inválido");
-    if (!Number.isInteger(stockNum) || stockNum < 0) throw new Error("Stock inválido");
-    const estiloId = uid();
-    const imagenes = await subirAngulos(`estilos/${estiloId}`, form);
-    const estilo = {
-      id: estiloId,
-      nombre: String(fd.get("estilo_nombre") || "Clásico").trim(),
-      color_hex: fd.get("color_hex") || "#c4a574",
-      costo: costoNum,
-      precio_venta: ventaNum,
-      stock: stockNum,
-      imagenes,
-    };
-    const ref = await db().collection("productos").add({
-      nombre,
-      descripcion: String(fd.get("descripcion") || "").trim(),
-      categoria: String(fd.get("categoria") || "General").trim(),
-      creado_en: nowIso(),
-      actualizado_en: nowIso(),
-      estilos: [estilo],
-    });
-    if (stockNum > 0) {
-      await db().collection("movimientos").add({
-        estilo_id: estiloId,
-        tipo: "entrada",
-        cantidad: stockNum,
-        costo_unitario: costoNum,
-        precio_unitario: null,
-        ganancia: 0,
-        nota: "Stock inicial",
-        producto: nombre,
-        estilo: estilo.nombre,
-        creado_en: nowIso(),
-      });
+    try {
+      return await crearProductoInterno(form);
+    } catch (err) {
+      throw errorHexa(err);
     }
-    return leerProducto(ref.id);
   },
   async borrarProducto(id) {
     await db().collection("productos").doc(String(id)).delete();
