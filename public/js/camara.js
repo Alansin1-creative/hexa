@@ -526,7 +526,7 @@ function encogerPorPerfil(mask, w, h, box) {
     for (let x = x0; x <= x1; x++) n += mask[y * w + x];
     return n / Math.max(1, x1 - x0 + 1);
   };
-  const umbral = 0.22;
+  const umbral = 0.4;
   while (maxX - minX > 20 && colOcup(minX, minY, maxY) < umbral) minX++;
   while (maxX - minX > 20 && colOcup(maxX, minY, maxY) < umbral) maxX--;
   while (maxY - minY > 20 && rowOcup(minY, minX, maxX) < umbral) minY++;
@@ -582,10 +582,9 @@ function bboxColorDelObjeto(data, w, h, blob) {
     for (let x = x0; x <= x1; x++) {
       const i = (y * w + x) * 4;
       const d = Math.abs(data[i] - tr) + Math.abs(data[i + 1] - tg) + Math.abs(data[i + 2] - tb);
-      if (d < 78) m[y * w + x] = 1;
+      if (d < 58) m[y * w + x] = 1;
     }
   }
-  m = dilatar(m, w, h);
   m = dilatar(m, w, h);
   m = erosionar(m, w, h);
   const tight = componenteMayor(m, w, h);
@@ -593,13 +592,60 @@ function bboxColorDelObjeto(data, w, h, blob) {
   return { blob: encogerPorPerfil(m, w, h, tight), mask: m };
 }
 
+function colorInterior(data, w, h, box) {
+  let R = 0,
+    G = 0,
+    B = 0,
+    n = 0;
+  const x0 = box.minX + Math.floor((box.maxX - box.minX) * 0.22);
+  const x1 = box.maxX - Math.floor((box.maxX - box.minX) * 0.22);
+  const y0 = box.minY + Math.floor((box.maxY - box.minY) * 0.22);
+  const y1 = box.maxY - Math.floor((box.maxY - box.minY) * 0.22);
+  for (let y = y0; y <= y1; y += 2) {
+    for (let x = x0; x <= x1; x += 2) {
+      const i = (y * w + x) * 4;
+      R += data[i];
+      G += data[i + 1];
+      B += data[i + 2];
+      n++;
+    }
+  }
+  return { r: R / Math.max(1, n), g: G / Math.max(1, n), b: B / Math.max(1, n) };
+}
+
+function esColorObjeto(data, w, x, y, c, umbral) {
+  const i = (y * w + x) * 4;
+  return Math.abs(data[i] - c.r) + Math.abs(data[i + 1] - c.g) + Math.abs(data[i + 2] - c.b) < umbral;
+}
+
+function encogerPorColor(data, w, h, box) {
+  const c = colorInterior(data, w, h, box);
+  let { minX, maxX, minY, maxY } = box;
+  const colOcup = (x, y0, y1) => {
+    let n = 0;
+    for (let y = y0; y <= y1; y++) if (esColorObjeto(data, w, x, y, c, 62)) n++;
+    return n / Math.max(1, y1 - y0 + 1);
+  };
+  const rowOcup = (y, x0, x1) => {
+    let n = 0;
+    for (let x = x0; x <= x1; x++) if (esColorObjeto(data, w, x, y, c, 62)) n++;
+    return n / Math.max(1, x1 - x0 + 1);
+  };
+  const umbral = 0.45;
+  while (maxX - minX > 18 && colOcup(minX, minY, maxY) < umbral) minX++;
+  while (maxX - minX > 18 && colOcup(maxX, minY, maxY) < umbral) maxX--;
+  while (maxY - minY > 18 && rowOcup(minY, minX, maxX) < umbral) minY++;
+  while (maxY - minY > 18 && rowOcup(maxY, minX, maxX) < umbral) maxY--;
+  return { minX, maxX, minY, maxY, count: (maxX - minX + 1) * (maxY - minY + 1) };
+}
+
 function refinarBordes(data, w, h, box) {
   const bw = box.maxX - box.minX + 1;
   const bh = box.maxY - box.minY + 1;
-  const padOutX = Math.max(3, Math.round(bw * 0.04));
-  const padInX = Math.max(10, Math.round(bw * 0.2));
-  const padOutY = Math.max(3, Math.round(bh * 0.04));
-  const padInY = Math.max(10, Math.round(bh * 0.2));
+  const padOutX = 1;
+  const padInX = Math.max(8, Math.round(bw * 0.18));
+  const padOutY = 1;
+  const padInY = Math.max(8, Math.round(bh * 0.18));
   const mejorV = (x0, x1, y0, y1) => {
     let bestX = Math.round((x0 + x1) / 2);
     let best = -1;
@@ -670,14 +716,12 @@ function bboxObjeto(srcCanvas) {
   candidatos.sort((a, b) => puntuarCaja(b, tw, th) - puntuarCaja(a, tw, th));
   let best = refinarBordes(crudo, tw, th, candidatos[0]);
   if (!cajaValida(best, tw, th)) best = candidatos[0];
-  const bw = best.maxX - best.minX + 1;
-  const bh = best.maxY - best.minY + 1;
-  const padX = Math.max(2, bw * 0.012);
-  const padY = Math.max(2, bh * 0.012);
-  const x = Math.max(0, best.minX - padX);
-  const y = Math.max(0, best.minY - padY);
-  const x2 = Math.min(tw, best.maxX + 1 + padX);
-  const y2 = Math.min(th, best.maxY + 1 + padY);
+  best = encogerPorColor(crudo, tw, th, best);
+  if (!cajaValida(best, tw, th)) best = candidatos[0];
+  const x = Math.max(0, best.minX);
+  const y = Math.max(0, best.minY);
+  const x2 = Math.min(tw, best.maxX + 1);
+  const y2 = Math.min(th, best.maxY + 1);
   return {
     x: (x / tw) * srcCanvas.width,
     y: (y / th) * srcCanvas.height,
@@ -808,8 +852,8 @@ function recordarAjusteCrop(autoRect, userRect) {
 function aplicarMemoriaCrop(rect) {
   const m = leerMemoriaCrop();
   if (m.n < 2) return rect;
-  const sx = Math.min(1.04, Math.max(0.78, m.scaleX));
-  const sy = Math.min(1.04, Math.max(0.78, m.scaleY));
+  const sx = Math.min(1, Math.max(0.82, m.scaleX));
+  const sy = Math.min(1, Math.max(0.82, m.scaleY));
   const cx = rect.x + rect.w / 2;
   const cy = rect.y + rect.h / 2;
   const w = rect.w * sx;
