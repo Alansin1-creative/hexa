@@ -31,7 +31,7 @@
   <script src="/js/theme.js"></script>
   <script src="/js/platform.js"></script>
   <script src="/js/carrito.js"></script>
-  <script src="/js/ruta.js"></script>
+  <script src="/js/ruta.js?v=10"></script>
   <script>
     (async () => {
       const id = new URLSearchParams(location.search).get("id");
@@ -51,7 +51,7 @@
                gps
                  ? `<iframe class="mapa-entrega" title="Destino de entrega" src="${HexaRuta.urlMapsEmbed(lat, lng)}" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
                     <div class="qty" style="margin-top:12px">
-                      <a class="btn con-ico" href="${HexaRuta.urlMapsDestino(lat, lng)}" target="_blank" rel="noopener">${window.hexaIco ? hexaIco("ruta") : ""}<span>Ir en Maps</span></a>
+                      <button type="button" class="btn con-ico" id="cargar-uno">${window.hexaIco ? hexaIco("ruta") : ""}<span>Cargar ruta en Maps</span></button>
                       <button type="button" class="ghost con-ico" id="add-parada">${window.hexaIco ? hexaIco("plus") : ""}<span>Agregar parada</span></button>
                       <a class="ghost con-ico" href="${HexaRuta.urlMapsPunto(lat, lng)}" target="_blank" rel="noopener">${window.hexaIco ? hexaIco("pin") : ""}<span>Ver punto</span></a>
                     </div>
@@ -60,14 +60,20 @@
              }
            </div>
            <p style="margin-top:18px"><a class="btn" href="/pedidos.html">Ver pedidos</a></p>`;
+        document.getElementById("cargar-uno")?.addEventListener("click", () => {
+          try {
+            HexaRuta.agregarParada(p);
+            HexaRuta.cargarEnMaps();
+          } catch (err) {
+            alert(err.message);
+          }
+        });
         document.getElementById("add-parada")?.addEventListener("click", () => {
           try {
             const ruta = HexaRuta.agregarParada(p);
             const msg = document.getElementById("msg-ruta");
-            msg.textContent = `Parada ${ruta.length} agregada. El destino ahora es ${p.nombre}.`;
+            msg.textContent = `Parada ${ruta.length} agregada. Pulsa “Cargar ruta en Maps” para abrirla.`;
             msg.className = "hint ok";
-            const ir = document.querySelector('a[href*="maps/dir"]');
-            if (ir) ir.href = HexaRuta.urlMapsRuta(ruta);
           } catch (err) {
             alert(err.message);
           }

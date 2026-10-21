@@ -16,7 +16,7 @@ function guardarRuta(stops) {
 function pedidoConGps(p) {
   const lat = Number(p?.lat);
   const lng = Number(p?.lng);
-  return Boolean(p?.permiso_ubicacion) && Number.isFinite(lat) && Number.isFinite(lng);
+  return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && !(lat === 0 && lng === 0);
 }
 
 function paradaDePedido(p) {
@@ -48,15 +48,29 @@ function vaciarRuta() {
 }
 
 function urlMapsDestino(lat, lng) {
-  return `https://www.google.com/maps/dir/?api=1&origin=Current+Location&destination=${encodeURIComponent(`${lat},${lng}`)}&travelmode=driving`;
+  return `https://www.google.com/maps/dir/Current+Location/${lat},${lng}`;
 }
 
 function urlMapsRuta(stops = leerRuta()) {
-  if (!stops.length) return "https://www.google.com/maps/dir/?api=1&origin=Current+Location&travelmode=driving";
-  const dest = stops[stops.length - 1];
-  const mids = stops.slice(0, -1).map((s) => `${s.lat},${s.lng}`).join("|");
-  let url = urlMapsDestino(dest.lat, dest.lng);
-  if (mids) url += `&waypoints=${encodeURIComponent(mids)}`;
+  const puntos = (stops && stops.length ? stops : leerRuta()).map((s) => `${s.lat},${s.lng}`);
+  if (!puntos.length) return "https://www.google.com/maps/dir/Current+Location/";
+  return `https://www.google.com/maps/dir/Current+Location/${puntos.join("/")}`;
+}
+
+function armarDesdePedidos(pedidos) {
+  const stops = (pedidos || [])
+    .filter(pedidoConGps)
+    .sort((a, b) => Number(a.id) - Number(b.id))
+    .map(paradaDePedido)
+    .filter(Boolean);
+  guardarRuta(stops);
+  return stops;
+}
+
+function cargarEnMaps(stops = leerRuta()) {
+  if (!stops.length) throw new Error("No hay entregas con GPS para armar la ruta.");
+  const url = urlMapsRuta(stops);
+  window.open(url, "_blank", "noopener");
   return url;
 }
 
@@ -72,20 +86,21 @@ function ico(name) {
   return window.hexaIco ? hexaIco(name) : "";
 }
 
-function pintarPanelRuta(root) {
+function pintarPanelRuta(root, pedidos = []) {
   if (!root) return;
+  const conGps = (pedidos || []).filter(pedidoConGps);
   const ruta = leerRuta();
   root.innerHTML = `
     <div class="ruta-head">
       <div>
         <div class="kicker">Entregas</div>
         <strong>Ruta en Maps</strong>
-        <p class="hint">Parte de tu ubicación y suma cada GPS como parada. La última es el destino.</p>
+        <p class="hint">El botón carga todos los GPS, parte de tu ubicación y deja la última entrega como destino.</p>
       </div>
       <div class="qty">
-        <a class="btn con-ico${ruta.length ? "" : " is-off"}" href="${ruta.length ? urlMapsRuta(ruta) : "#"}" target="_blank" rel="noopener" id="abrir-ruta">
-          ${ico("ruta")}<span>Abrir ruta</span>
-        </a>
+        <button type="button" class="btn con-ico" id="cargar-ruta" ${conGps.length ? "" : "disabled"}>
+          ${ico("ruta")}<span>Cargar ruta en Maps</span>
+        </button>
         <button type="button" class="ghost" id="vaciar-ruta" ${ruta.length ? "" : "disabled"}>Vaciar</button>
       </div>
     </div>
@@ -100,16 +115,25 @@ function pintarPanelRuta(root) {
               </li>`
             )
             .join("")}</ol>`
-        : `<p class="hint">Aún no hay paradas. En un pedido con GPS pulsa “Agregar parada”.</p>`
+        : `<p class="hint">${conGps.length ? `${conGps.length} entregas con GPS listas. Pulsa el botón para abrirlas en Maps.` : "Cuando un pedido tenga GPS, aquí se arma la ruta."}</p>`
     }`;
+  root.querySelector("#cargar-ruta")?.addEventListener("click", () => {
+    try {
+      const stops = armarDesdePedidos(pedidos);
+      cargarEnMaps(stops);
+      pintarPanelRuta(root, pedidos);
+    } catch (err) {
+      alert(err.message);
+    }
+  });
   root.querySelector("#vaciar-ruta")?.addEventListener("click", () => {
     vaciarRuta();
-    pintarPanelRuta(root);
+    pintarPanelRuta(root, pedidos);
   });
   root.querySelectorAll("[data-quitar-parada]").forEach((btn) => {
     btn.addEventListener("click", () => {
       quitarParada(btn.dataset.quitarParada);
-      pintarPanelRuta(root);
+      pintarPanelRuta(root, pedidos);
     });
   });
 }
@@ -120,6 +144,8 @@ window.HexaRuta = {
   quitarParada,
   vaciarRuta,
   pedidoConGps,
+  armarDesdePedidos,
+  cargarEnMaps,
   urlMapsDestino,
   urlMapsRuta,
   urlMapsPunto,

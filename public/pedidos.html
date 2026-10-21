@@ -47,12 +47,12 @@
   <script src="/js/theme.js"></script>
   <script src="/js/platform.js"></script>
   <script src="/js/carrito.js"></script>
-  <script src="/js/ruta.js"></script>
+  <script src="/js/ruta.js?v=10"></script>
   <script>
     (async () => {
       const panel = document.getElementById("ruta-panel");
-      HexaRuta.pintarPanelRuta(panel);
       const d = await HexaAPI.pedidos();
+      HexaRuta.pintarPanelRuta(panel, d);
       document.getElementById("tabla").innerHTML = `
         <thead><tr><th>#</th><th>Cliente</th><th>Teléfono</th><th>Pago</th><th>GPS</th><th>Total</th><th>Fecha</th></tr></thead>
         <tbody>${
@@ -82,7 +82,7 @@
         btn.addEventListener("click", () => {
           try {
             HexaRuta.agregarParada(porId[btn.dataset.parada]);
-            HexaRuta.pintarPanelRuta(panel);
+            HexaRuta.pintarPanelRuta(panel, d);
             btn.querySelector("span").textContent = "En ruta";
           } catch (err) {
             alert(err.message);
