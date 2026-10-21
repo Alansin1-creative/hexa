@@ -10,8 +10,8 @@ async function cargar() {
 }
 
 function render(producto) {
-  const elegido = Number(new URLSearchParams(location.search).get("estilo")) || producto.estilos[0].id;
-  const estilo = producto.estilos.find((e) => e.id === elegido) || producto.estilos[0];
+  const elegido = new URLSearchParams(location.search).get("estilo") || producto.estilos[0].id;
+  const estilo = producto.estilos.find((e) => String(e.id) === String(elegido)) || producto.estilos[0];
   const imgs = Object.entries(estilo.imagenes);
   document.title = `HEXA · ${producto.nombre}`;
   document.getElementById("detalle").innerHTML = `
