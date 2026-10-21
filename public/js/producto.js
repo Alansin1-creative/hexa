@@ -37,7 +37,7 @@ function render(producto) {
               .join("")}</div>`
           : `<p class="hint" style="margin-top:12px">${
               estilo.es_3d
-                ? "Arrastra el cubo para girar el modelo 3D construido con las seis caras."
+                ? "Arrastra el modelo para girarlo. El tamaño sigue las proporciones de las fotos."
                 : "Faltan ángulos: se muestra en 2D."
             }</p>`
       }
