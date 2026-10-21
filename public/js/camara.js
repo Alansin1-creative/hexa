@@ -27,7 +27,9 @@ let cropRect = { x: 80, y: 80, w: 864, h: 864 };
 let cropAspect = 0;
 let cropDrag = null;
 let origenToma = "camara";
+let ultimoAutoRect = null;
 const FOTO_LADO = 1024;
+const CROP_MEM = "hexa-crop-memoria";
 
 function fileInputDe(form, angulo) {
   return form?.querySelector(`input[name="${angulo}"]`);
@@ -399,10 +401,11 @@ function puntuarCaja(blob, w, h) {
   const bh = blob.maxY - blob.minY + 1;
   const bboxA = (bw * bh) / (w * h);
   const aspect = bw / bh;
-  const areaScore = 1 - Math.min(1, Math.abs(bboxA - 0.36) / 0.36);
+  const areaScore = 1 - Math.min(1, Math.abs(bboxA - 0.24) / 0.4);
   const aspScore = 1 - Math.min(1, Math.abs(Math.log2(aspect)) / 2);
   const margen = Math.min(blob.minX, blob.minY, w - 1 - blob.maxX, h - 1 - blob.maxY);
-  return areaScore * 0.5 + aspScore * 0.35 + Math.min(margen / 24, 1) * 0.15;
+  const tightness = 1 - Math.min(1, bboxA);
+  return areaScore * 0.35 + aspScore * 0.3 + Math.min(margen / 20, 1) * 0.1 + tightness * 0.25;
 }
 
 function picoEn(arr, a, b) {
@@ -495,9 +498,100 @@ function bboxPorCentro(data, w, h) {
   return cajaValida(blob, w, h) ? blob : null;
 }
 
+function abrirMascara(m, w, h) {
+  m = erosionar(m, w, h);
+  m = erosionar(m, w, h);
+  m = dilatar(m, w, h);
+  m = dilatar(m, w, h);
+  return m;
+}
+
+function encogerPorPerfil(mask, w, h, box) {
+  let { minX, maxX, minY, maxY } = box;
+  const colOcup = (x, y0, y1) => {
+    let n = 0;
+    for (let y = y0; y <= y1; y++) n += mask[y * w + x];
+    return n / Math.max(1, y1 - y0 + 1);
+  };
+  const rowOcup = (y, x0, x1) => {
+    let n = 0;
+    for (let x = x0; x <= x1; x++) n += mask[y * w + x];
+    return n / Math.max(1, x1 - x0 + 1);
+  };
+  const umbral = 0.22;
+  while (maxX - minX > 20 && colOcup(minX, minY, maxY) < umbral) minX++;
+  while (maxX - minX > 20 && colOcup(maxX, minY, maxY) < umbral) maxX--;
+  while (maxY - minY > 20 && rowOcup(minY, minX, maxX) < umbral) minY++;
+  while (maxY - minY > 20 && rowOcup(maxY, minX, maxX) < umbral) maxY--;
+  return { minX, maxX, minY, maxY, count: (maxX - minX + 1) * (maxY - minY + 1) };
+}
+
+function bboxColorDelObjeto(data, w, h, blob) {
+  const q = (v) => v >> 4;
+  const key = (r, g, b) => (q(r) << 8) | (q(g) << 4) | q(b);
+  const bg = new Set();
+  for (let x = 0; x < w; x += 2) {
+    for (const y of [0, 1, 2, h - 1, h - 2, h - 3]) {
+      const i = (y * w + x) * 4;
+      bg.add(key(data[i], data[i + 1], data[i + 2]));
+    }
+  }
+  for (let y = 0; y < h; y += 2) {
+    for (const x of [0, 1, 2, w - 1, w - 2, w - 3]) {
+      const i = (y * w + x) * 4;
+      bg.add(key(data[i], data[i + 1], data[i + 2]));
+    }
+  }
+  const marginX = Math.max(2, Math.floor((blob.maxX - blob.minX) * 0.14));
+  const marginY = Math.max(2, Math.floor((blob.maxY - blob.minY) * 0.14));
+  const counts = new Map();
+  for (let y = blob.minY + marginY; y <= blob.maxY - marginY; y++) {
+    for (let x = blob.minX + marginX; x <= blob.maxX - marginX; x++) {
+      const i = (y * w + x) * 4;
+      const k = key(data[i], data[i + 1], data[i + 2]);
+      if (bg.has(k)) continue;
+      counts.set(k, (counts.get(k) || 0) + 1);
+    }
+  }
+  let bestK = -1;
+  let bestN = 0;
+  counts.forEach((n, k) => {
+    if (n > bestN) {
+      bestN = n;
+      bestK = k;
+    }
+  });
+  if (bestK < 0 || bestN < 12) return null;
+  const tr = ((bestK >> 8) & 15) * 16 + 8;
+  const tg = ((bestK >> 4) & 15) * 16 + 8;
+  const tb = (bestK & 15) * 16 + 8;
+  let m = new Uint8Array(w * h);
+  const x0 = Math.max(0, blob.minX - 6);
+  const x1 = Math.min(w - 1, blob.maxX + 6);
+  const y0 = Math.max(0, blob.minY - 6);
+  const y1 = Math.min(h - 1, blob.maxY + 6);
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      const i = (y * w + x) * 4;
+      const d = Math.abs(data[i] - tr) + Math.abs(data[i + 1] - tg) + Math.abs(data[i + 2] - tb);
+      if (d < 78) m[y * w + x] = 1;
+    }
+  }
+  m = dilatar(m, w, h);
+  m = dilatar(m, w, h);
+  m = erosionar(m, w, h);
+  const tight = componenteMayor(m, w, h);
+  if (!cajaValida(tight, w, h)) return null;
+  return { blob: encogerPorPerfil(m, w, h, tight), mask: m };
+}
+
 function refinarBordes(data, w, h, box) {
-  const padX = Math.max(8, Math.round((box.maxX - box.minX) * 0.14));
-  const padY = Math.max(8, Math.round((box.maxY - box.minY) * 0.14));
+  const bw = box.maxX - box.minX + 1;
+  const bh = box.maxY - box.minY + 1;
+  const padOutX = Math.max(3, Math.round(bw * 0.04));
+  const padInX = Math.max(10, Math.round(bw * 0.2));
+  const padOutY = Math.max(3, Math.round(bh * 0.04));
+  const padInY = Math.max(10, Math.round(bh * 0.2));
   const mejorV = (x0, x1, y0, y1) => {
     let bestX = Math.round((x0 + x1) / 2);
     let best = -1;
@@ -532,16 +626,16 @@ function refinarBordes(data, w, h, box) {
     }
     return bestY;
   };
-  const left = mejorV(box.minX - padX, box.minX + padX, box.minY, box.maxY);
-  const right = mejorV(box.maxX - padX, box.maxX + padX, box.minY, box.maxY);
-  const top = mejorH(box.minY - padY, box.minY + padY, box.minX, box.maxX);
-  const bot = mejorH(box.maxY - padY, box.maxY + padY, box.minX, box.maxX);
+  const left = mejorV(box.minX - padOutX, box.minX + padInX, box.minY, box.maxY);
+  const right = mejorV(box.maxX - padInX, box.maxX + padOutX, box.minY, box.maxY);
+  const top = mejorH(box.minY - padOutY, box.minY + padInY, box.minX, box.maxX);
+  const bot = mejorH(box.maxY - padInY, box.maxY + padOutY, box.minX, box.maxX);
   if (right - left < 16 || bot - top < 16) return box;
   return { minX: left, maxX: right, minY: top, maxY: bot, count: (right - left + 1) * (bot - top + 1) };
 }
 
 function bboxObjeto(srcCanvas) {
-  const tw = 240;
+  const tw = 256;
   const th = Math.max(140, Math.round((srcCanvas.height * tw) / srcCanvas.width));
   const small = document.createElement("canvas");
   small.width = tw;
@@ -549,27 +643,29 @@ function bboxObjeto(srcCanvas) {
   const sctx = small.getContext("2d", { willReadFrequently: true });
   sctx.drawImage(srcCanvas, 0, 0, tw, th);
   const crudo = sctx.getImageData(0, 0, tw, th).data;
-  const data = blurCaja(crudo, tw, th, 2);
+  const data = blurCaja(crudo, tw, th, 1);
   const candidatos = [];
-  for (const umbral of [16, 28, 42, 58, 78, 104, 132]) {
+  for (const umbral of [18, 32, 48, 64, 88, 112, 140]) {
     let m = inundarFondo(data, tw, th, umbral);
-    m = dilatar(m, tw, th);
-    m = erosionar(m, tw, th);
+    m = abrirMascara(m, tw, th);
     const blob = componenteMayor(m, tw, th);
-    if (cajaValida(blob, tw, th)) candidatos.push(blob);
+    if (!cajaValida(blob, tw, th)) continue;
+    candidatos.push(encogerPorPerfil(m, tw, th, blob));
+    const color = bboxColorDelObjeto(crudo, tw, th, blob);
+    if (color?.blob && cajaValida(color.blob, tw, th)) candidatos.push(color.blob);
   }
-  const porBorde = bboxPorBordes(data, tw, th);
+  const porBorde = bboxPorBordes(crudo, tw, th);
   if (porBorde) candidatos.push(porBorde);
   const porCentro = bboxPorCentro(data, tw, th);
   if (porCentro) candidatos.push(porCentro);
   if (!candidatos.length) return null;
   candidatos.sort((a, b) => puntuarCaja(b, tw, th) - puntuarCaja(a, tw, th));
-  let best = refinarBordes(data, tw, th, candidatos[0]);
+  let best = refinarBordes(crudo, tw, th, candidatos[0]);
   if (!cajaValida(best, tw, th)) best = candidatos[0];
   const bw = best.maxX - best.minX + 1;
   const bh = best.maxY - best.minY + 1;
-  const padX = Math.max(3, bw * 0.025);
-  const padY = Math.max(3, bh * 0.025);
+  const padX = Math.max(2, bw * 0.012);
+  const padY = Math.max(2, bh * 0.012);
   const x = Math.max(0, best.minX - padX);
   const y = Math.max(0, best.minY - padY);
   const x2 = Math.min(tw, best.maxX + 1 + padX);
@@ -674,17 +770,60 @@ function mostrarFotoBase() {
   pintarCropBox();
 }
 
+function leerMemoriaCrop() {
+  try {
+    const m = JSON.parse(localStorage.getItem(CROP_MEM) || "null");
+    if (!m || !m.n) return { n: 0, scaleX: 1, scaleY: 1 };
+    return m;
+  } catch (_) {
+    return { n: 0, scaleX: 1, scaleY: 1 };
+  }
+}
+
+function recordarAjusteCrop(autoRect, userRect) {
+  if (!autoRect || !userRect || autoRect.w < 40 || autoRect.h < 40) return;
+  const sx = userRect.w / autoRect.w;
+  const sy = userRect.h / autoRect.h;
+  if (sx < 0.5 || sx > 1.25 || sy < 0.5 || sy > 1.25) return;
+  const m = leerMemoriaCrop();
+  const ema = m.n < 3 ? 0.4 : 0.18;
+  m.scaleX = m.n ? m.scaleX * (1 - ema) + sx * ema : sx;
+  m.scaleY = m.n ? m.scaleY * (1 - ema) + sy * ema : sy;
+  m.n = Math.min((m.n || 0) + 1, 50);
+  try {
+    localStorage.setItem(CROP_MEM, JSON.stringify(m));
+  } catch (_) {
+    /* private mode */
+  }
+}
+
+function aplicarMemoriaCrop(rect) {
+  const m = leerMemoriaCrop();
+  if (m.n < 2) return rect;
+  const sx = Math.min(1.04, Math.max(0.78, m.scaleX));
+  const sy = Math.min(1.04, Math.max(0.78, m.scaleY));
+  const cx = rect.x + rect.w / 2;
+  const cy = rect.y + rect.h / 2;
+  const w = rect.w * sx;
+  const h = rect.h * sy;
+  return { x: cx - w / 2, y: cy - h / 2, w, h };
+}
+
 function sugerirCorte(canvas) {
   const caja = bboxObjeto(canvas);
   const areaOk = caja && caja.w > 48 && caja.h > 48 && caja.w * caja.h < 0.82 * FOTO_LADO * FOTO_LADO;
-  if (areaOk) return { rect: caja, auto: true };
-  return { rect: { x: 72, y: 72, w: 880, h: 880 }, auto: false };
+  if (areaOk) {
+    const rect = aplicarMemoriaCrop(caja);
+    return { rect, auto: true, crudo: caja };
+  }
+  return { rect: { x: 72, y: 72, w: 880, h: 880 }, auto: false, crudo: null };
 }
 
 function aplicarAutoCorte() {
   if (!fotoBase) return;
   cropAspect = 0;
-  const { rect, auto } = sugerirCorte(fotoBase);
+  const { rect, auto, crudo } = sugerirCorte(fotoBase);
+  ultimoAutoRect = crudo || rect;
   cropRect = clampCrop(rect);
   pintarCropBox();
   marcarHerramienta();
@@ -791,6 +930,7 @@ function entrarRevision(canvas) {
   fotoBase = canvas;
   pendiente = true;
   const sugerido = sugerirCorte(canvas);
+  ultimoAutoRect = sugerido.crudo || sugerido.rect;
   cropAspect = 0;
   cropRect = clampCrop(sugerido.rect);
   mostrarFotoBase();
@@ -798,7 +938,9 @@ function entrarRevision(canvas) {
   const msg = document.getElementById("cam-review-msg");
   if (msg) {
     msg.textContent = sugerido.auto
-      ? "Ajusta el recuadro y confirma el recorte."
+      ? leerMemoriaCrop().n >= 2
+        ? "Ajusta si hace falta. HEXA afina el recorte con tus confirmaciones."
+        : "Ajusta el recuadro y confirma el recorte."
       : "Mueve y estira el recuadro hasta cubrir solo el objeto.";
   }
   modoRevision(true);
@@ -897,6 +1039,7 @@ function cablearEstudio() {
       alert("El recorte salió vacío.");
       return;
     }
+    recordarAjusteCrop(ultimoAutoRect, cropRect);
     aplicarFoto(blob);
     pendiente = null;
     fotoBase = null;
