@@ -1155,10 +1155,53 @@ function aplicarFoto(blob) {
   if (formDestino && typeof pintarProgreso === "function") pintarProgreso(formDestino);
 }
 
+function pintarIconosEstudio() {
+  const ico = window.hexaIco;
+  if (!ico) return;
+  const solo = {
+    "crop-auto": ["auto", "Auto"],
+    "crop-1-1": ["ratio11", "1:1"],
+    "crop-3-4": ["ratio34", "3:4"],
+    "crop-4-3": ["ratio43", "4:3"],
+    "crop-16-9": ["ratio169", "16:9"],
+    "crop-libre": ["libre", "Libre"],
+    "crop-todo": ["toda", "Toda la foto"],
+    "crop-menos": ["zoomOut", "Alejar"],
+    "crop-mas": ["zoomIn", "Acercar"],
+    "crop-rot-izq": ["rotIzq", "Girar izquierda"],
+    "crop-rot-der": ["rotDer", "Girar derecha"],
+    "crop-reset": ["centrar", "Centrar vista"],
+    "crop-grid": ["guia", "Guía"],
+  };
+  Object.entries(solo).forEach(([id, [name, label]]) => {
+    const b = document.getElementById(id);
+    if (!b) return;
+    b.classList.add("ico-btn");
+    b.title = label;
+    b.setAttribute("aria-label", label);
+    b.innerHTML = ico(name);
+  });
+  const conTexto = {
+    "cam-capturar": ["camara", "Capturar"],
+    "cam-subir": ["subir", "Subir"],
+    "cam-saltar": ["saltar", "Saltar"],
+    "cam-cerrar": ["cerrar", "Cerrar"],
+    "cam-usar": ["recorte", "Usar recorte"],
+    "cam-repetir": ["repetir", "Repetir"],
+  };
+  Object.entries(conTexto).forEach(([id, [name, label]]) => {
+    const b = document.getElementById(id);
+    if (!b) return;
+    b.classList.add("con-ico");
+    b.innerHTML = `${ico(name)}<span>${label}</span>`;
+  });
+}
+
 function cablearEstudio() {
   const modal = document.getElementById("estudio");
   if (!modal || modal.dataset.ready) return;
   modal.dataset.ready = "1";
+  pintarIconosEstudio();
   const stage = document.getElementById("crop-stage");
   const box = document.getElementById("crop-box");
   const distanciaPunteros = () => {

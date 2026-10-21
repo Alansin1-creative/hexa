@@ -35,8 +35,8 @@ function montarAngulos(container, imagenes = {}) {
         <img class="prev" alt="${label}" ${imagenes[id] ? `src="${imagenes[id]}"` : "hidden"} />
         <input class="file-oculto" type="file" name="${id}" accept="image/*" />
         <div class="angle-actions">
-          <button type="button" class="ghost cam-one" data-angulo="${id}">Cámara</button>
-          <button type="button" class="ghost file-one" data-angulo="${id}">Subir</button>
+          <button type="button" class="ghost cam-one con-ico" data-angulo="${id}">${window.hexaIco ? hexaIco("camara") : ""}<span>Cámara</span></button>
+          <button type="button" class="ghost file-one con-ico" data-angulo="${id}">${window.hexaIco ? hexaIco("subir") : ""}<span>Subir</span></button>
         </div>
       </div>`
   ).join("");
@@ -84,8 +84,16 @@ function montarAngulos(container, imagenes = {}) {
   });
 }
 
+function pintarBotonEstudio(btn, texto) {
+  if (!btn) return;
+  btn.classList.add("con-ico");
+  btn.innerHTML = `${window.hexaIco ? hexaIco("cubo") : ""}<span>${texto}</span>`;
+}
+
 function cablearEstudioForm(form) {
-  form.querySelector("[data-estudio]")?.addEventListener("click", () => {
+  const estudio = form.querySelector("[data-estudio]");
+  pintarBotonEstudio(estudio, estudio?.textContent?.trim() || "Estudio 3D (6 fotos)");
+  estudio?.addEventListener("click", () => {
     iniciarEstudio({ form, angulos: ANGULOS.map(([id]) => id) });
   });
 }
@@ -169,7 +177,9 @@ window.abrirAlta = abrirAlta;
   }
 });
 
-document.getElementById("btn-nuevo")?.addEventListener("click", () => {
+const btnNuevo = document.getElementById("btn-nuevo");
+if (btnNuevo && window.hexaIco) btnNuevo.innerHTML = hexaIco("plus");
+btnNuevo?.addEventListener("click", () => {
   modoAltaNuevo();
   abrirAlta();
 });
@@ -296,7 +306,7 @@ function pintarLista() {
                   </div>
                   <div class="row">
                     <p class="hint" data-progreso></p>
-                    <button type="button" class="ghost" data-estudio>Estudio 3D</button>
+                    <button type="button" class="ghost con-ico" data-estudio>Estudio 3D</button>
                   </div>
                   <div class="angles"></div>
                   <button class="btn" type="submit">Guardar estilo</button>

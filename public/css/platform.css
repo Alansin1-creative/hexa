@@ -354,6 +354,8 @@ html[data-ui="material"] .estudio-box { border-radius: 28px; }
     text-align: center;
     padding: 0;
     background: transparent;
+    display: grid;
+    place-items: center;
   }
 
   html[data-ui="cupertino"] main.wrap,

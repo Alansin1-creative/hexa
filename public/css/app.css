@@ -99,6 +99,33 @@ button, input, textarea, select { font: inherit; color: inherit; }
   font-weight: 650;
 }
 .ghost:hover, .nav a:hover { border-color: var(--gold); }
+.ico {
+  width: 20px;
+  height: 20px;
+  display: block;
+  flex: none;
+}
+.con-ico {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.ico-btn {
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
+.tab-ico {
+  display: grid;
+  place-items: center;
+}
+.tab-ico .ico { width: 22px; height: 22px; }
+.btn-plus { display: grid; place-items: center; }
+.btn-plus .ico { width: 22px; height: 22px; }
+.fab .ico { width: 26px; height: 26px; margin: auto; }
 .themes { display: flex; gap: 6px; }
 .dot {
   width: 22px; height: 22px; border-radius: 50%;
@@ -280,7 +307,9 @@ label { font-size: 12px; color: var(--muted); display: grid; gap: 6px; }
   padding: 7px 6px;
   font-size: 12px;
   text-align: center;
+  justify-content: center;
 }
+.angle-actions .ico { width: 16px; height: 16px; }
 .file-oculto {
   position: absolute;
   width: 1px; height: 1px;
@@ -495,6 +524,9 @@ label { font-size: 12px; color: var(--muted); display: grid; gap: 6px; }
 .crop-tools .ghost {
   padding: 8px 12px;
   font-size: 13px;
+}
+.crop-tools .ico-btn {
+  padding: 0;
 }
 .crop-tools .ghost.on {
   border-color: var(--gold);
