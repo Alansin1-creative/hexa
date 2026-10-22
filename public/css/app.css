@@ -136,7 +136,9 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .dot[data-theme-btn="neon"] { background: #55e0c8; }
 
 .hero { padding: 54px 0 28px; display: grid; gap: 10px; }
+.hero .row { align-items: flex-start; }
 .hero .row h1 { font-size: clamp(28px, 4vw, 40px); }
+#cargar-ruta-maps { flex: none; white-space: nowrap; }
 .kicker { color: var(--gold); text-transform: uppercase; letter-spacing: 0.22em; font-size: 12px; }
 h1, h2, h3 { font-family: var(--display); font-weight: 560; margin: 0; }
 h1 { font-size: clamp(36px, 6vw, 64px); line-height: 1.05; }

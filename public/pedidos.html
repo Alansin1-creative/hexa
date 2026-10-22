@@ -31,8 +31,13 @@
   <main class="wrap" style="padding:36px 0 80px">
     <section class="hero" style="padding-top:8px">
       <div class="kicker">Tienda</div>
-      <h1>Pedidos de clientes</h1>
-      <p class="lede">Los pedidos llegan aquí cuando alguien confirma en la tienda. Si hay GPS, agrégalo como parada y ábrelo en Maps.</p>
+      <div class="row">
+        <div>
+          <h1>Pedidos de clientes</h1>
+          <p class="lede">Los pedidos llegan aquí cuando alguien confirma en la tienda. El botón carga en Maps una ruta desde tu ubicación hasta cada GPS.</p>
+        </div>
+        <button type="button" class="btn con-ico" id="cargar-ruta-maps">Cargar ruta en Maps</button>
+      </div>
     </section>
     <div class="card ruta-panel" id="ruta-panel"></div>
     <div class="card" style="padding:8px 16px 16px; overflow:auto">
@@ -47,18 +52,44 @@
   <script src="/js/theme.js"></script>
   <script src="/js/platform.js"></script>
   <script src="/js/carrito.js"></script>
-  <script src="/js/ruta.js?v=10"></script>
+  <script src="/js/ruta.js?v=11"></script>
   <script>
+    function puntosGps(pedidos) {
+      return (pedidos || [])
+        .filter((p) => Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lng)))
+        .sort((a, b) => Number(a.id) - Number(b.id));
+    }
+    function abrirRutaMaps(pedidos) {
+      const pts = puntosGps(pedidos).map((p) => `${Number(p.lat)},${Number(p.lng)}`);
+      if (!pts.length) {
+        alert("Ningún pedido tiene GPS todavía.");
+        return;
+      }
+      if (window.HexaRuta) {
+        HexaRuta.armarDesdePedidos(pedidos);
+        HexaRuta.cargarEnMaps();
+        return;
+      }
+      window.open(`https://www.google.com/maps/dir/Current+Location/${pts.join("/")}`, "_blank", "noopener");
+    }
     (async () => {
       const panel = document.getElementById("ruta-panel");
-      const d = await HexaAPI.pedidos();
-      HexaRuta.pintarPanelRuta(panel, d);
+      const btn = document.getElementById("cargar-ruta-maps");
+      let d = [];
+      try {
+        d = await HexaAPI.pedidos();
+      } catch (err) {
+        document.getElementById("tabla").innerHTML = `<tbody><tr><td>${err.message}</td></tr></tbody>`;
+        return;
+      }
+      btn?.addEventListener("click", () => abrirRutaMaps(d));
+      if (window.HexaRuta) HexaRuta.pintarPanelRuta(panel, d);
       document.getElementById("tabla").innerHTML = `
         <thead><tr><th>#</th><th>Cliente</th><th>Teléfono</th><th>Pago</th><th>GPS</th><th>Total</th><th>Fecha</th></tr></thead>
         <tbody>${
           d.length
             ? d.map((p) => {
-                const gps = HexaRuta.pedidoConGps(p);
+                const gps = window.HexaRuta ? HexaRuta.pedidoConGps(p) : Number.isFinite(Number(p.lat));
                 const lat = Number(p.lat);
                 const lng = Number(p.lng);
                 return `<tr>
@@ -67,8 +98,8 @@
                 <td>${
                   gps
                     ? `<div class="gps-acciones">
-                        <a class="ghost con-ico" href="${HexaRuta.urlMapsDestino(lat, lng)}" target="_blank" rel="noopener">${window.hexaIco ? hexaIco("pin") : ""}<span>${lat.toFixed(4)}, ${lng.toFixed(4)}</span></a>
-                        <button type="button" class="ghost con-ico" data-parada="${p.id}">${window.hexaIco ? hexaIco("plus") : ""}<span>Parada</span></button>
+                        <a class="ghost" href="https://www.google.com/maps/dir/Current+Location/${lat},${lng}" target="_blank" rel="noopener">${lat.toFixed(4)}, ${lng.toFixed(4)}</a>
+                        <button type="button" class="ghost" data-parada="${p.id}">Parada</button>
                       </div>`
                     : "no"
                 }</td>
@@ -78,12 +109,14 @@
             : `<tr><td colspan="7">Aún no hay pedidos.</td></tr>`
         }</tbody>`;
       const porId = Object.fromEntries(d.map((p) => [String(p.id), p]));
-      document.querySelectorAll("[data-parada]").forEach((btn) => {
-        btn.addEventListener("click", () => {
+      document.querySelectorAll("[data-parada]").forEach((el) => {
+        el.addEventListener("click", () => {
           try {
-            HexaRuta.agregarParada(porId[btn.dataset.parada]);
-            HexaRuta.pintarPanelRuta(panel, d);
-            btn.querySelector("span").textContent = "En ruta";
+            if (window.HexaRuta) {
+              HexaRuta.agregarParada(porId[el.dataset.parada]);
+              HexaRuta.pintarPanelRuta(panel, d);
+            }
+            el.textContent = "En ruta";
           } catch (err) {
             alert(err.message);
           }

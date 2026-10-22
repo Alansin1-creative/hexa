@@ -1,27 +1,8 @@
-const CACHE = "hexa-v10";
+const CACHE = "hexa-v11";
 const APP_SHELL = [
-  "/",
-  "/admin.html",
-  "/ganancias.html",
-  "/producto.html",
-  "/checkout.html",
-  "/pedido.html",
-  "/pedidos.html",
   "/offline.html",
   "/css/app.css",
   "/css/platform.css",
-  "/js/platform-boot.js",
-  "/js/platform.js",
-  "/js/theme.js",
-  "/js/catalogo.js",
-  "/js/admin.js",
-  "/js/camara.js",
-  "/js/ganancias.js",
-  "/js/producto.js",
-  "/js/carrito.js",
-  "/js/checkout.js",
-  "/js/viewer3d.js",
-  "/js/ruta.js",
   "/manifest.json",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
@@ -44,11 +25,14 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(req.url);
   if (url.pathname.startsWith("/api/")) return;
 
+  const esPagina = url.pathname === "/" || url.pathname.endsWith(".html") || url.pathname.endsWith(".js");
   event.respondWith(
     fetch(req)
       .then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE).then((cache) => cache.put(req, copy));
+        if (!esPagina && res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then((cache) => cache.put(req, copy));
+        }
         return res;
       })
       .catch(async () => {
